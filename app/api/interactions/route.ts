@@ -1,5 +1,6 @@
 import nacl from "tweetnacl";
 import { FUN_COMMANDS, buildResponse } from "@/lib/funCommands";
+import { handleMod } from "@/lib/modHandlers";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,11 @@ export async function POST(req: Request) {
 
   // 3) Comando de barra
   if (body.type === 2) {
+    // 3a) comandos de moderação/membros/info (retorna null se não for um deles)
+    const mod = await handleMod(body);
+    if (mod) return Response.json(mod);
+
+    // 3b) comandos divertidos
     const name = body.data?.name;
     const cmd = FUN_COMMANDS.find((c) => c.name === name);
     if (!cmd) return Response.json({ type: 4, data: { content: "Comando desconhecido." } });

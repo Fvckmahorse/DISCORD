@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { isOwner } from "@/lib/owner";
 import { FUN_COMMANDS } from "@/lib/funCommands";
+import { MOD_COMMANDS } from "@/lib/modCommands";
 
 export const runtime = "nodejs";
 
@@ -18,11 +19,12 @@ export async function GET(req: Request) {
     ? `https://discord.com/api/v10/applications/${appId}/guilds/${guild}/commands`
     : `https://discord.com/api/v10/applications/${appId}/commands`;
 
-  const commands = FUN_COMMANDS.map((c) => ({
+  const funCommands = FUN_COMMANDS.map((c) => ({
     name: c.name,
     description: (c.description || `Descobre quantos % ${c.adjective} alguém é`).slice(0, 100),
     options: [{ type: 6, name: "alvo", description: "Quem você quer medir?", required: true }],
   }));
+  const commands = [...funCommands, ...MOD_COMMANDS];
 
   const res = await fetch(endpoint, {
     method: "PUT",
