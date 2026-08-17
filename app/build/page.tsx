@@ -13,6 +13,7 @@ function BuildInner() {
   const [text, setText] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [engine, setEngine] = useState<string>("");
+  const [aiError, setAiError] = useState<string>("");
   const [building, setBuilding] = useState(false);
   const [applying, setApplying] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -26,7 +27,7 @@ function BuildInner() {
       const res = await fetch("/api/interpret", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
       const data = await res.json();
       if (!res.ok) { setErr(data.error || "Falha ao interpretar."); setResult(null); }
-      else { setResult(data); setEngine(data.engine || ""); }
+      else { setResult(data); setEngine(data.engine || ""); setAiError(data.aiError || ""); }
     } catch (e: any) { setErr(e?.message || "Erro de rede."); }
     finally { setBuilding(false); }
   }
@@ -70,6 +71,7 @@ function BuildInner() {
           <button className="btn btn-primary" onClick={build} disabled={building}>{building ? "Interpretando…" : "Montar prévia"}</button>
           {engine && <span className="faint" style={{ fontFamily:"var(--mono)", fontSize:12 }}>motor: {engine}</span>}
         </div>
+        {aiError && <div className="note warn" style={{ marginTop: 10 }}><span className="ic">!</span><span>IA indisponível — usando o interpretador local. Motivo: <code style={{fontFamily:"var(--mono)"}}>{aiError}</code></span></div>}
       </div>
 
       {result && cfg && (

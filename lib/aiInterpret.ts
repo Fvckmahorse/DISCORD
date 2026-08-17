@@ -1,70 +1,63 @@
 /* Interpretação por IA (Google Gemini, free tier).
-   Usa o "manual de raciocínio" como system prompt e devolve JSON validado
-   no mesmo formato Config que o resto do app usa. */
+   Usa o "manual de raciocínio" como system prompt e devolve JSON no formato Config.
+   Tenta vários modelos e reporta o erro real se todos falharem. */
 import type { Config, Cat, Ch, Role, Result } from "./interpret";
 
 const norm = (s: string) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 const ROLE_COLORS = ["#f1c40f","#5865f2","#43b581","#e67e22","#e74c3c","#9b59b6","#1abac6","#95a5a6"];
 const PERMS = ["ADMINISTRATOR","MANAGE_MESSAGES","MODERATE_MEMBERS","BAN_MEMBERS","KICK_MEMBERS","MANAGE_CHANNELS","MANAGE_ROLES","ATTACH_FILES","MENTION_EVERYONE","MANAGE_GUILD"];
 
-const SYSTEM = `Você é o cérebro do zoiudoAI: interpreta pedidos em português para montar servidores do Discord.
+const SYSTEM = `Você é o MOTOR DE INTERPRETAÇÃO de um bot que cria servidores Discord.
+Sua função é entender a INTENÇÃO completa do usuário (linguagem natural, informal, longa ou curta) e transformar em estrutura Discord válida. INTENÇÃO DO USUÁRIO > PALAVRAS ISOLADAS.
 
-REGRA MAIS IMPORTANTE: NUNCA transforme uma instrução, regra, explicação ou frase descritiva em nome de categoria, canal ou cargo. Só vira objeto o que o usuário realmente apresentou como categoria/canal/cargo.
+REGRA ABSOLUTA: NUNCA crie categoria, canal ou cargo a partir de uma frase de INSTRUÇÃO.
+São instruções (nunca viram nomes): "crie", "adicione", "com os canais", "todos os canais", "os canais devem", "seguido de", "somente leitura", "privada", "privado", "visível somente para", "não crie duplicados", "padrão", "especial", "hierarquia", "permissões", "configure", "mantenha", "obrigatoriamente", "devem", "deve".
 
-Frases como "somente leitura", "privado", "visível apenas para...", "com os canais", "todos os canais devem...", "mantenha organizado", "não crie duplicados", "hierarquia", "padrão" são INSTRUÇÕES, nunca nomes.
+SEPARE NOME DE CONFIGURAÇÃO:
+- "STAFF privada" => name:"STAFF", private:true. NUNCA name:"STAFF privada".
+- "regras somente leitura" => name:"regras", readonly:true. NUNCA name:"regras somente leitura".
+- "STAFF deve ser privada" (STAFF já existe) => só muda config; NÃO cria outra STAFF.
 
-EMOJIS: se o usuário pedir emojis nos canais/categorias, isso é regra de FORMATAÇÃO — escolha um emoji que combine com CADA nome (ex.: regras→📜, anúncios→📢, chat-geral→💬, novidades→🆕, staff→🔒). Nunca crie um canal com o texto da instrução.
+CATEGORIA PRIVADA: private:true e liste em "allow" os cargos que podem ver. Não crie canais representando permissões.
 
-CATEGORIA PRIVADA: configure permissões (não crie canais representando permissões). Liste em "allow" os cargos que podem ver.
+EMOJIS (quando o usuário pedir): é regra de FORMATAÇÃO. Escolha um emoji que combine com CADA nome. Preencha o campo "emoji" de cada categoria/canal (só o emoji, ex.: "📢"). O app junta como "emoji┃nome". Ex.: regras→📜, anúncios→📢, novidades→🆕, chat-geral→💬, memes→😂, sugestões→💡, ajuda→🆘, staff→🔒, informações→📚, comunidade→💬, gaming→🎮, voz→🔊. NUNCA coloque o texto da instrução como nome.
 
-SOMENTE LEITURA: marque readonly=true (o @everyone perde envio, mantém ver).
+CARGOS: só os explicitamente pedidos. "hierarquia" indica a ORDEM (de cima pra baixo), não é um cargo.
 
 NÃO DUPLICAR: não repita categorias/canais/cargos com o mesmo objetivo.
 
-Responda SOMENTE com um JSON (sem texto fora dele, sem markdown) neste formato exato:
+Responda SOMENTE com um JSON (sem markdown, sem texto fora) neste formato:
 {
   "server": { "name": string|null },
   "roles": [ { "name": string, "permissions": string[], "hoist": boolean } ],
   "categories": [
-    {
-      "name": string,
-      "emoji": string|null,
-      "private": boolean,
-      "allow": string[],            // nomes dos cargos que podem ver (se private)
-      "channels": [ { "name": string, "type": "text"|"voice"|"announcement"|"forum", "readonly": boolean, "emoji": string|null } ]
-    }
+    { "name": string, "emoji": string|null, "private": boolean, "allow": string[],
+      "channels": [ { "name": string, "type": "text"|"voice"|"announcement"|"forum", "readonly": boolean, "emoji": string|null } ] }
   ]
 }
-"permissions" só pode conter: ${PERMS.join(", ")}. Não invente permissões. Não dê ADMINISTRATOR a @everyone. Se o pedido não mencionar algo, use listas vazias / false / null.`;
+"permissions" só pode conter: ${PERMS.join(", ")}. Nunca ADMINISTRATOR para @everyone. Campos não mencionados: use [] / false / null.`;
 
 function pickPerms(arr: any): string[] {
   if (!Array.isArray(arr)) return [];
   return arr.map(String).map(s => s.toUpperCase().trim()).filter(p => PERMS.includes(p));
 }
-
 function toConfig(ai: any): Config {
   const roles: Role[] = (ai?.roles || []).map((r: any, i: number) => ({
     key: norm(r?.name || ""), name: String(r?.name || "").trim(),
     color: ROLE_COLORS[i % ROLE_COLORS.length], permissions: pickPerms(r?.permissions), hoist: !!r?.hoist,
   })).filter((r: Role) => r.name);
-
   const categories: Cat[] = (ai?.categories || []).map((c: any) => {
     const channels: Ch[] = (c?.channels || []).map((ch: any) => ({
       raw: String(ch?.name || "").trim(),
       type: ["text","voice","announcement","forum"].includes(ch?.type) ? ch.type : "text",
-      readonly: !!ch?.readonly,
-      emoji: ch?.emoji || undefined,
+      readonly: !!ch?.readonly, emoji: ch?.emoji || undefined,
     })).filter((ch: Ch) => ch.raw);
-    return {
-      name: String(c?.name || "").trim(), emoji: c?.emoji || undefined,
-      private: !!c?.private, allow: (c?.allow || []).map((x: any) => norm(String(x))), channels,
-    };
+    return { name: String(c?.name || "").trim(), emoji: c?.emoji || undefined,
+      private: !!c?.private, allow: (c?.allow || []).map((x: any) => norm(String(x))), channels };
   }).filter((c: Cat) => c.name);
-
   return { server: { name: (ai?.server?.name || "Meu Servidor").toString() }, roles, categories };
 }
-
-function applySafety(config: Config): { warnings: string[]; blocks: string[]; applied: string[] } {
+function applySafety(config: Config) {
   const warnings: string[] = [], blocks: string[] = [], applied: string[] = [];
   const ownerRole = config.roles.find(r => /owner|dono|admin/.test(r.key));
   config.categories.forEach(cat => {
@@ -75,34 +68,42 @@ function applySafety(config: Config): { warnings: string[]; blocks: string[]; ap
   });
   config.roles.forEach(r => { if (r.permissions.includes("ADMINISTRATOR")) applied.push(`O cargo "${r.name}" recebeu Administrador.`); });
   let total = 0;
-  config.categories.forEach(cat => { total += cat.channels.length; if (cat.channels.length > 50) warnings.push(`"${cat.name}" tem ${cat.channels.length} canais (máx. 50 por categoria no Discord).`); });
-  if (total > 500) warnings.push(`${total} canais no total (máx. 500 por servidor).`);
+  config.categories.forEach(cat => { total += cat.channels.length; if (cat.channels.length > 50) warnings.push(`"${cat.name}" tem ${cat.channels.length} canais (máx. 50/categoria).`); });
+  if (total > 500) warnings.push(`${total} canais no total (máx. 500/servidor).`);
   if (total > 0) applied.push(`${total} canais em ${config.categories.length} categoria(s).`);
   return { warnings, blocks, applied };
+}
+function parseJson(raw: string): any {
+  try { return JSON.parse(raw); } catch { return JSON.parse(raw.replace(/```json|```/g, "").trim()); }
 }
 
 export async function aiInterpret(text: string): Promise<Result> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("sem GEMINI_API_KEY");
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 
-  const res = await fetch(url, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: SYSTEM }] },
-      contents: [{ role: "user", parts: [{ text: text }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-    }),
-  });
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 160)}`);
-  const data = await res.json();
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!raw) throw new Error("resposta vazia da IA");
-  let parsed: any;
-  try { parsed = JSON.parse(raw); } catch { parsed = JSON.parse(raw.replace(/```json|```/g, "").trim()); }
+  const models = [process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-1.5-flash"]
+    .filter(Boolean).filter((v, i, a) => a.indexOf(v) === i) as string[];
 
-  const config = toConfig(parsed);
-  const { warnings, blocks, applied } = applySafety(config);
-  return { config, warnings, blocks, applied };
+  let lastErr = "";
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+      const res = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM }] },
+          contents: [{ role: "user", parts: [{ text }] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+        }),
+      });
+      if (!res.ok) { lastErr = `${model}: HTTP ${res.status} ${(await res.text()).slice(0, 160)}`; continue; }
+      const data = await res.json();
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!raw) { lastErr = `${model}: resposta vazia ${JSON.stringify(data?.promptFeedback || {}).slice(0, 120)}`; continue; }
+      const config = toConfig(parseJson(raw));
+      const s = applySafety(config);
+      return { config, ...s };
+    } catch (e: any) { lastErr = `${model}: ${e?.message || e}`; }
+  }
+  throw new Error(lastErr || "IA falhou");
 }
