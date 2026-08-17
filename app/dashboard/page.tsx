@@ -13,10 +13,8 @@ export default async function Dashboard() {
   let guilds: Guild[] = [];
   let error: string | null = null;
   if (discordConnected && token) {
-    try {
-      const all = await listUserGuilds(token);
-      guilds = all.filter(canManage);
-    } catch (e: any) {
+    try { guilds = (await listUserGuilds(token)).filter(canManage); }
+    catch (e: any) {
       error = e?.message === "DISCORD_TOKEN_EXPIRED"
         ? "Sua conexão com o Discord expirou. Conecte novamente."
         : "Não consegui carregar seus servidores agora. Tente de novo em instantes.";
@@ -28,24 +26,20 @@ export default async function Dashboard() {
       <div className="topbar">
         <div className="mark" style={{ marginBottom: 0 }}>
           <div className="glyph">n</div>
-          <div>
-            <div className="wordmark">nigg<span> AI</span></div>
-            <div className="eyebrow">painel</div>
-          </div>
+          <div><div className="wordmark">nigg<span> AI</span></div><div className="eyebrow">painel</div></div>
         </div>
         <div className="row">
           <span className="pill">olá, {session.user.name?.split(" ")[0] ?? "você"}</span>
           <SignOutButton />
         </div>
       </div>
-
       <div className="divider" />
 
       {!discordConnected ? (
         <div className="card">
           <div className="step-k">passo 2 de 2</div>
           <h1 style={{ fontSize: 22 }}>Conecte seu Discord para começar</h1>
-          <p className="lede">Vamos só ver quem você é e listar os servidores onde você pode configurar. Nada é alterado ainda.</p>
+          <p className="lede">Vamos só ver quem você é e listar os servidores onde você pode configurar.</p>
           <DiscordButton />
         </div>
       ) : (
@@ -53,37 +47,34 @@ export default async function Dashboard() {
           <div className="card">
             <div className="step-k">seus servidores</div>
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <h1 style={{ fontSize: 22, margin: 0 }}>Onde você pode configurar</h1>
-              <a className="btn btn-primary" href={addBotUrl()}>+ Criar / adicionar em outro</a>
+              <h1 style={{ fontSize: 22, margin: 0 }}>Onde você pode construir</h1>
+              <a className="btn btn-ghost" href={addBotUrl()}>+ Adicionar o bot em outro</a>
             </div>
 
             {error && <div className="note" style={{ marginTop: 14 }}>⚠️ {error} <DiscordButton label="Reconectar Discord" /></div>}
-
             {!error && guilds.length === 0 && (
-              <div className="note" style={{ marginTop: 14 }}>
-                Você não tem servidores onde possa gerenciar. Crie um no Discord (botão “+”) e volte aqui — ou use “Criar / adicionar em outro”.
-              </div>
+              <div className="note" style={{ marginTop: 14 }}>Você não tem servidores onde possa gerenciar. Crie um no Discord (botão “+”) e volte aqui.</div>
             )}
 
             <div className="guilds">
               {guilds.map((g) => (
                 <div className="guild" key={g.id}>
-                  <div className="ic">
-                    {iconUrl(g) ? <img src={iconUrl(g)!} alt="" /> : (g.name?.[0] ?? "?").toUpperCase()}
-                  </div>
-                  <div>
+                  <div className="ic">{iconUrl(g) ? <img src={iconUrl(g)!} alt="" /> : (g.name?.[0] ?? "?").toUpperCase()}</div>
+                  <div style={{ minWidth: 0 }}>
                     <div className="gn">{g.name}</div>
                     <div className="role">{g.owner ? "você é dono" : "você gerencia"}</div>
                   </div>
-                  <a className="btn btn-discord add" href={addBotUrl(g.id)}>Adicionar bot</a>
+                  <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+                    <a className="btn btn-ghost add" href={addBotUrl(g.id)}>Add bot</a>
+                    <a className="btn btn-primary add" href={`/build?guild=${g.id}&name=${encodeURIComponent(g.name)}`}>Construir →</a>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="note">
-            Próximo passo (Fase 3): depois que o bot estiver no servidor, abre o construtor,
-            descreve a estrutura e aplica. Isso será ligado em seguida.
+            Dica: se o servidor ainda não tem o bot, clique em “Add bot” primeiro. Depois “Construir”.
           </div>
         </>
       )}
