@@ -38,7 +38,13 @@ export const PERM_LABEL: Record<string,string> = {
 };
 
 const norm = (s: string) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
-const clean = (s: string) => (s||"").replace(/^[#\s🔊📢💬🗣️•\-–]+/,"").replace(/[.,;:!]+$/,"").trim();
+const clean = (s: string) => (s||"").replace(/^[#\s🔊📢💬🗣️•\-–"'“”*]+/,"").replace(/["'“”*.,;:!]+$/,"").trim();
+
+/** Normaliza o texto antes de interpretar: tira asteriscos de ênfase (*10*)
+ *  e converte aspas curvas em retas, pra não atrapalhar as regras. */
+function preprocess(t: string): string {
+  return (t||"").replace(/\r/g,"").replace(/[*]/g,"").replace(/[“”„]/g,'"').replace(/[‘’]/g,"'");
+}
 
 function variantsFor(nameLower: string): string[] {
   for (const g of ROLE_SYNONYMS) if (g.includes(nameLower)) return g;
@@ -64,7 +70,7 @@ export function displayChannel(name: string, type: string): string {
 export function interpret(text: string): Result {
   const warnings: string[] = [], blocks: string[] = [], applied: string[] = [];
   const config: Config = { server:{ name:"Meu Servidor" }, roles:[], categories:[] };
-  const raw = (text||"").replace(/\r/g,"");
+  const raw = preprocess(text);
   const lowerAll = norm(raw);
   const sentences = raw.split(/(?<=[.\n!?])/).map(s=>s.trim()).filter(Boolean);
 
@@ -98,7 +104,7 @@ export function interpret(text: string): Result {
   function extractChannels(s: string): Ch[] {
     const out: Ch[] = [];
     const push = (name: string, type?: Ch["type"]) => { const k=norm(name); if (k && !out.some(o=>norm(o.raw)===k)) out.push({ raw:clean(name), type:(type||inferType(name)), readonly:false }); };
-    const r = s.match(/([a-zà-ú][a-zà-ú_-]*?)\s*(\d+)\b[\s\d,.\u2026-]*?(?:at[eé]|\bao?\b|\bà\b|-)\s*(?:o\s+)?(?:[a-zà-ú][a-zà-ú_-]*)?\s*(\d+)/i);
+    const r = s.match(/["']?([a-zà-ú][a-zà-ú_-]*?)["']?\s*(\d+)["']?[\s\d,."'\u2026-]*?(?:at[eé]|\bao?\b|\bà\b|-)\s*(?:o\s+)?["']?(?:[a-zà-ú][a-zà-ú_-]*)?["']?\s*(\d+)["']?/i);
     if (r) {
       const base=clean(r[1]).replace(/\d+$/,""); const a=parseInt(r[2],10), b=parseInt(r[3],10);
       if (base && !/^(o|a|os|as|de|com|e|at[eé]|cana(l|is)|categoria|para|numerados?|nomeados?)$/i.test(base) && b>=a && (b-a)<=2000)
@@ -118,7 +124,7 @@ export function interpret(text: string): Result {
     }
     return out;
   }
-  const catDeclRe = /categoria\s+(privada\s+)?(?:chamada\s+|chamado\s+|nomeada\s+|de nome\s+|de\s+|para\s+(?:a|o)?\s*|pra\s+)?["']?([a-zà-ú0-9][a-zà-ú0-9 _-]{1,39}?)["']?(?=$|[.,:]|\s+(?:privada|com\b|e\b|contendo|:))/i;
+  const catDeclRe = /categ[a-zà-ú]*\s+(privada\s+)?(?:com\s+(?:o\s+)?nome\s+de\s+|com\s+(?:o\s+)?nome\s+|chamada\s+|chamado\s+|nomeada\s+de\s+|nomeada\s+|de\s+nome\s+|de\s+|para\s+(?:a|o)?\s*|pra\s+)?["']?([a-zà-ú0-9][a-zà-ú0-9 _-]{1,39}?)["']?(?=$|[.,:"']|\s+(?:privada|com\b|e\b|contendo|:))/i;
   let currentCat: Cat | null = null;
   sentences.forEach(sen => {
     const decl = sen.match(catDeclRe);
@@ -150,7 +156,7 @@ export function interpret(text: string): Result {
   });
 
   // acesso privado
-  const accRe = /(?:somente|só|so|apenas)\s+(.+?)\s+(?:podem?|pode|tem acesso a|têm acesso a)\s+(?:acessar|ver|entrar em|ter acesso a)?\s*(?:a\s+|o\s+)?(?:categoria|canal|área|area|sala)?\s*["']?([a-zà-ú0-9 _-]{2,30})/gi;
+  const accRe = /(?:somente|só|so|apenas)\s+(.+?)\s+(?:podem?|pode|tem acesso a|têm acesso a)\s+(?:acessar|ver|entrar em|ter acesso a)?\s*(?:a\s+|o\s+)?(?:categ[a-zà-ú]*|canal|área|area|sala)?\s*["']?([a-zà-ú0-9 _-]{2,30})/gi;
   let am: RegExpExecArray | null;
   while ((am = accRe.exec(raw))) {
     const roleTokens = splitList(am[1]).map(norm).filter(Boolean);
