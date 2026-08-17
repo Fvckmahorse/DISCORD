@@ -11,6 +11,8 @@ import Discord from "next-auth/providers/discord";
  * de banco (Prisma/Drizzle). Para o MVP, esta abordagem cobre o fluxo pedido.
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
+  debug: true,
   providers: [
     Google,
     Discord({

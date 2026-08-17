@@ -77,33 +77,65 @@ function parseJson(raw: string): any {
   try { return JSON.parse(raw); } catch { return JSON.parse(raw.replace(/```json|```/g, "").trim()); }
 }
 
+async function callModel(model: string, key: string, text: string): Promise<Result> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const res = await fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM }] },
+      contents: [{ role: "user", parts: [{ text }] }],
+      generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+    }),
+  });
+  if (!res.ok) throw new Error(`${model}: HTTP ${res.status} ${(await res.text()).slice(0, 140)}`);
+  const data = await res.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error(`${model}: resposta vazia ${JSON.stringify(data?.promptFeedback || {}).slice(0, 100)}`);
+  const config = toConfig(parseJson(raw));
+  const s = applySafety(config);
+  return { config, ...s };
+}
+
+// Descobre os modelos que a chave realmente tem acesso (e que suportam generateContent).
+async function discoverModels(key: string): Promise<string[]> {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const models: string[] = (data?.models || [])
+      .filter((m: any) => (m?.supportedGenerationMethods || []).includes("generateContent"))
+      .map((m: any) => String(m?.name || "").replace(/^models\//, ""))
+      .filter((n: string) => n && /gemini/i.test(n) && !/vision|embedding|aqa|imagen|tts|image/i.test(n));
+    const score = (m: string) => (/flash/.test(m) ? 10 : 0) + (/2\.5/.test(m) ? 5 : 0) + (/2\.0/.test(m) ? 4 : 0) + (/pro/.test(m) ? 2 : 0) + (/latest/.test(m) ? 1 : 0) - (/lite|thinking|exp|preview/.test(m) ? 2 : 0);
+    return models.sort((a, b) => score(b) - score(a));
+  } catch { return []; }
+}
+
+let cachedModel: string | null = null;
+
 export async function aiInterpret(text: string): Promise<Result> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("sem GEMINI_API_KEY");
 
-  const models = [process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-1.5-flash"]
+  const staticList = [process.env.GEMINI_MODEL, cachedModel, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
     .filter(Boolean).filter((v, i, a) => a.indexOf(v) === i) as string[];
 
   let lastErr = "";
-  for (const model of models) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-      const res = await fetch(url, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM }] },
-          contents: [{ role: "user", parts: [{ text }] }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-        }),
-      });
-      if (!res.ok) { lastErr = `${model}: HTTP ${res.status} ${(await res.text()).slice(0, 160)}`; continue; }
-      const data = await res.json();
-      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!raw) { lastErr = `${model}: resposta vazia ${JSON.stringify(data?.promptFeedback || {}).slice(0, 120)}`; continue; }
-      const config = toConfig(parseJson(raw));
-      const s = applySafety(config);
-      return { config, ...s };
-    } catch (e: any) { lastErr = `${model}: ${e?.message || e}`; }
+  for (const model of staticList) {
+    try { const r = await callModel(model, key, text); cachedModel = model; return r; }
+    catch (e: any) { lastErr = String(e?.message || e); }
   }
-  throw new Error(lastErr || "IA falhou");
+
+  // Se a lista fixa falhou (nomes 404), descobre os modelos reais da conta.
+  const discovered = await discoverModels(key);
+  for (const model of discovered) {
+    if (staticList.includes(model)) continue;
+    try { const r = await callModel(model, key, text); cachedModel = model; return r; }
+    catch (e: any) { lastErr = String(e?.message || e); }
+  }
+
+  const hint = discovered.length
+    ? ` | modelos da sua conta: ${discovered.slice(0, 6).join(", ")}`
+    : " | nenhum modelo encontrado (ative a 'Generative Language API' e use uma chave do aistudio.google.com/apikey)";
+  throw new Error(lastErr + hint);
 }
