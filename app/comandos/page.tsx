@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { isOwner } from "@/lib/owner";
 import { FUN_COMMANDS } from "@/lib/funCommands";
 import RegisterButtons from "./RegisterButtons";
 
@@ -9,8 +10,8 @@ export default async function Comandos() {
   const session = await auth();
   if (!session?.user) redirect("/");
 
-  return (
-    <main className="wrap">
+  const header = (
+    <>
       <div className="topbar">
         <div className="mark" style={{ marginBottom: 0 }}>
           <div className="glyph"><img src="/logo.png" alt="zoiudoAI" /></div>
@@ -19,11 +20,29 @@ export default async function Comandos() {
         <a className="btn btn-ghost" href="/dashboard">← Painel</a>
       </div>
       <div className="divider" />
+    </>
+  );
 
+  if (!isOwner(session)) {
+    return (
+      <main className="wrap">
+        {header}
+        <div className="card">
+          <div className="step-k">acesso restrito</div>
+          <h1 style={{ fontSize: 22, marginTop: 4 }}>Essa área é só do dono 🔒</h1>
+          <p className="lede">Somente o administrador do zoiudoAI pode ver e gerenciar os comandos do bot.</p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="wrap">
+      {header}
       <div className="card">
         <div className="step-k">comandos divertidos</div>
         <h1 style={{ fontSize: 22, marginTop: 4 }}>Slash commands do seu bot</h1>
-        <p className="lede">Use no Discord assim: <code style={{fontFamily:"var(--mono)"}}>/guloso alvo:@alguém</code> → o bot responde com uma porcentagem aleatória.</p>
+        <p className="lede">Use no Discord assim: <code style={{ fontFamily: "var(--mono)" }}>/guloso alvo:@alguém</code> → o bot responde com uma porcentagem aleatória.</p>
 
         <div className="roles">
           {FUN_COMMANDS.map((c) => (
@@ -38,7 +57,7 @@ export default async function Comandos() {
       </div>
 
       <div className="note">
-        Pra adicionar/editar comandos: por enquanto eles ficam no arquivo <code>lib/funCommands.ts</code>. Me peça e eu adiciono os que você quiser — depois é só clicar em “Registrar” aqui.
+        Pra adicionar/editar comandos: eles ficam no arquivo <code>lib/funCommands.ts</code>. Me peça e eu adiciono os que você quiser — depois é só clicar em “Registrar” aqui.
       </div>
     </main>
   );
