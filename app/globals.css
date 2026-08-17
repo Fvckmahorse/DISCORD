@@ -67,3 +67,25 @@ h1{font-size:30px;letter-spacing:-.02em;margin:6px 0 10px}
 .footlinks{margin-top:26px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
 .footlinks a{color:var(--faint)}
 .footlinks a:hover{color:var(--muted)}
+
+/* catálogo de comandos (layout inspirado em catálogos por categoria) */
+.cmd-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 14px}
+.cmd-category{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:16px;background:var(--panel)}
+.cmd-category-header{display:flex;align-items:center;gap:14px;padding:16px 18px;border-left:4px solid var(--cat,#7c6cff);
+  background:linear-gradient(90deg, color-mix(in srgb, var(--cat,#7c6cff) 14%, transparent), transparent 60%)}
+.cmd-category-header .cat-emoji{font-size:26px;line-height:1}
+.cmd-category-header h2{margin:0;font-size:18px;letter-spacing:-.01em}
+.cmd-category-header p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.cmd-category-header .count{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint);border:1px solid var(--line);padding:4px 9px;border-radius:999px}
+.cmd-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:10px;padding:16px 18px}
+.cmd-entry{border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--panel2);transition:.12s ease}
+.cmd-entry:hover{border-color:var(--cat,var(--accent))}
+.cmd-pill{display:inline-block;font-family:var(--mono);font-size:13px;font-weight:600;background:var(--accent-soft);color:var(--accent);border:1px solid #7c6cff44;padding:4px 9px;border-radius:7px}
+.cmd-desc{color:var(--text);font-size:13.5px;margin-top:9px;line-height:1.45}
+.cmd-meta{color:var(--faint);font-size:11.5px;margin-top:8px;font-family:var(--mono);display:flex;gap:8px;flex-wrap:wrap}
+.cmd-meta .tagp{border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+/* criador de comando */
+.creator{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:16px;margin-top:12px}
+.creator label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px;font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase}
+.creator input,.creator select,.creator textarea{width:100%;background:var(--ink);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-family:var(--sans);font-size:14px}
+.creator textarea{min-height:70px;resize:vertical}

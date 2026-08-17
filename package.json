@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "postbuild": "tsx scripts/register.ts || true"
   },
   "dependencies": {
     "next": "14.2.35",
@@ -17,6 +18,7 @@
   "devDependencies": {
     "@types/node": "20.14.9",
     "@types/react": "18.3.3",
-    "typescript": "5.5.3"
+    "typescript": "5.5.3",
+    "tsx": "^4.19.2"
   }
 }
