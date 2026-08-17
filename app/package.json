@@ -1,0 +1,22 @@
+{
+  "name": "nigg-ai",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.2.35",
+    "next-auth": "5.0.0-beta.20",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.9",
+    "@types/react": "18.3.3",
+    "typescript": "5.5.3"
+  }
+}
