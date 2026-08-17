@@ -14,7 +14,19 @@ export async function GET(req: Request) {
   const botToken = process.env.DISCORD_BOT_TOKEN;
   if (!appId || !botToken) return Response.json({ error: "Faltam AUTH_DISCORD_ID ou DISCORD_BOT_TOKEN na Vercel." }, { status: 500 });
 
-  const guild = new URL(req.url).searchParams.get("guild");
+  const url = new URL(req.url);
+  const clear = url.searchParams.get("clear"); // id do servidor pra limpar (remove duplicados)
+  if (clear) {
+    const res = await fetch(`https://discord.com/api/v10/applications/${appId}/guilds/${clear}/commands`, {
+      method: "PUT",
+      headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
+      body: "[]",
+    });
+    return Response.json({ ok: res.ok, status: res.status,
+      message: res.ok ? "✓ Comandos DESTE servidor removidos. Sobraram só os globais (sem duplicatas)." : `Falha ao limpar (${res.status}).` });
+  }
+
+  const guild = url.searchParams.get("guild");
   const endpoint = guild
     ? `https://discord.com/api/v10/applications/${appId}/guilds/${guild}/commands`
     : `https://discord.com/api/v10/applications/${appId}/commands`;

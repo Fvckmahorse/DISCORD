@@ -9,6 +9,20 @@ export default function CommandCreator() {
   const [resp, setResp] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [guild, setGuild] = useState("");
+  const [adminMsg, setAdminMsg] = useState<string | null>(null);
+  const [adminBusy, setAdminBusy] = useState(false);
+
+  async function sync(clear: boolean) {
+    setAdminBusy(true); setAdminMsg(null);
+    try {
+      const q = clear ? `?clear=${encodeURIComponent(guild.trim())}` : "";
+      const res = await fetch(`/api/register-commands${q}`);
+      const data = await res.json();
+      setAdminMsg(data.message || (data.ok ? `✓ ${data.registered} comandos sincronizados (${data.scope}).` : `⚠️ ${data.error || "erro"}`));
+    } catch (e: any) { setAdminMsg("❌ " + (e?.message || "erro")); }
+    finally { setAdminBusy(false); }
+  }
 
   async function create() {
     setBusy(true); setMsg(null);
@@ -25,8 +39,22 @@ export default function CommandCreator() {
 
   return (
     <div>
+      <div className="creator" style={{ marginTop: 0, marginBottom: 12 }}>
+        <div className="step-k">registro & duplicados</div>
+        <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>Os comandos já se registram sozinhos a cada deploy. Use os botões abaixo só se precisar forçar, ou pra tirar duplicatas.</p>
+        <div className="row" style={{ marginTop: 8 }}>
+          <button className="btn btn-ghost" disabled={adminBusy} onClick={() => sync(false)}>🔄 Sincronizar (global)</button>
+        </div>
+        <label style={{ marginTop: 12 }}>Remover duplicados de um servidor (cole o ID)</label>
+        <div className="row">
+          <input value={guild} onChange={e => setGuild(e.target.value)} placeholder="ID do servidor" style={{ flex: 1 }} />
+          <button className="btn btn-ghost" disabled={adminBusy || !guild.trim()} onClick={() => sync(true)}>🧹 Limpar duplicados</button>
+        </div>
+        {adminMsg && <div className="note" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>{adminMsg}</div>}
+      </div>
+
       <div className="cmd-toolbar">
-        <div className="muted" style={{ fontSize: 13 }}>Os comandos se registram sozinhos a cada deploy — você não precisa registrar nada. 🎉</div>
+        <div className="muted" style={{ fontSize: 13 }}>Crie um comando de resposta personalizada.</div>
         <button className="btn btn-primary" onClick={() => setOpen(!open)}>＋ Criar comando</button>
       </div>
       {open && (
