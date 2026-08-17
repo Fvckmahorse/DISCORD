@@ -29,6 +29,7 @@ export default async function Dashboard() {
           <div><div className="wordmark">zoiudo<span>AI</span></div><div className="eyebrow">painel</div></div>
         </div>
         <div className="row">
+          <a className="btn btn-ghost" href="/comandos">Comandos</a>
           <span className="pill">olá, {session.user.name?.split(" ")[0] ?? "você"}</span>
           <SignOutButton />
         </div>

@@ -34,6 +34,11 @@ export default async function Home() {
         🔒 Depois do Google, você conecta seu Discord e escolhe onde adicionar o bot.
         Nada é criado sem a sua confirmação.
       </div>
+
+      <div className="footlinks">
+        <a href="/termos">Termos de Serviço</a>
+        <a href="/privacidade">Política de Privacidade</a>
+      </div>
     </main>
   );
 }

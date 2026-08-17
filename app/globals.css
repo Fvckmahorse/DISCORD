@@ -53,3 +53,17 @@ h1{font-size:30px;letter-spacing:-.02em;margin:6px 0 10px}
 .divider{height:1px;background:var(--line);margin:22px 0}
 .note{display:flex;gap:10px;padding:12px 13px;border-radius:10px;font-size:13px;border:1px solid var(--line);background:var(--panel2);color:var(--muted)}
 .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+
+/* páginas legais */
+.legal{max-width:760px}
+.legal h1{font-size:26px;margin:6px 0 4px}
+.legal .upd{color:var(--faint);font-family:var(--mono);font-size:12px;letter-spacing:.04em;margin-bottom:22px}
+.legal h2{font-size:16px;margin:26px 0 8px;color:var(--text)}
+.legal p, .legal li{color:var(--muted);font-size:14.5px;line-height:1.65}
+.legal ul{margin:8px 0;padding-left:20px}
+.legal li{margin:4px 0}
+.legal a{color:var(--accent)}
+.legal .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:14px}
+.footlinks{margin-top:26px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
+.footlinks a{color:var(--faint)}
+.footlinks a:hover{color:var(--muted)}
