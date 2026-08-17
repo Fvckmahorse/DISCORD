@@ -1,4 +1,4 @@
-# nigg AI — construtor de servidor do Discord
+# Zoiudo AI — construtor de servidor do Discord
 
 Descreva seu servidor em português e a IA monta a estrutura (categorias, canais,
 cargos e permissões). Você aplica com um clique.
