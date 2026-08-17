@@ -25,8 +25,8 @@ export default async function Dashboard() {
     <main className="wrap">
       <div className="topbar">
         <div className="mark" style={{ marginBottom: 0 }}>
-          <div className="glyph">n</div>
-          <div><div className="wordmark">nigg<span> AI</span></div><div className="eyebrow">painel</div></div>
+          <div className="glyph"><img src="/logo.png" alt="zoiudoAI" /></div>
+          <div><div className="wordmark">zoiudo<span>AI</span></div><div className="eyebrow">painel</div></div>
         </div>
         <div className="row">
           <span className="pill">olá, {session.user.name?.split(" ")[0] ?? "você"}</span>

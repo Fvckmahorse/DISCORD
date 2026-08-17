@@ -46,8 +46,8 @@ function BuildInner() {
     <main className="wrap">
       <div className="topbar">
         <div className="mark" style={{ marginBottom: 0 }}>
-          <div className="glyph">n</div>
-          <div><div className="wordmark">nigg<span> AI</span></div><div className="eyebrow">construtor</div></div>
+          <div className="glyph"><img src="/logo.png" alt="zoiudoAI" /></div>
+          <div><div className="wordmark">zoiudo<span>AI</span></div><div className="eyebrow">construtor</div></div>
         </div>
         <a className="btn btn-ghost" href="/dashboard">← Voltar</a>
       </div>

@@ -57,7 +57,7 @@ export async function applyConfig(guildId: string, config: Config, token: string
       const r = await dapi(`/guilds/${guildId}/roles`, "POST", {
         name: role.name, color: hexToInt(role.color), hoist: role.hoist,
         permissions: permsToBits(role.permissions),
-        reason: "nigg AI",
+        reason: "zoiudoAI",
       } as any, token, log);
       keyToRoleId[role.key] = r.id;
       created.roles++;

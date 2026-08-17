@@ -9,9 +9,9 @@ export default async function Home() {
   return (
     <main className="wrap">
       <div className="mark">
-        <div className="glyph">n</div>
+        <div className="glyph"><img src="/logo.png" alt="zoiudoAI" /></div>
         <div>
-          <div className="wordmark">nigg<span> AI</span></div>
+          <div className="wordmark">zoiudo<span>AI</span></div>
           <div className="eyebrow">construtor de servidor</div>
         </div>
       </div>
