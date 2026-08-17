@@ -198,10 +198,31 @@ export function interpret(text: string): Result {
 }
 
 
+function firstEmoji(s: string): string | undefined {
+  const m = (s || "").match(/\p{Extended_Pictographic}(\uFE0F)?(\u200D\p{Extended_Pictographic}(\uFE0F)?)*/u);
+  return m ? m[0] : undefined;
+}
+/** Remove qualquer prefixo de emoji(s) + separador(es) já existente, mantendo
+ *  só o primeiro emoji e o nome limpo. Garante idempotência. */
+function stripEmojiPrefix(s: string): { emoji?: string; name: string } {
+  let str = (s || "").trim();
+  let firstE: string | undefined;
+  for (let i = 0; i < 6; i++) {
+    const e = firstEmoji(str);
+    if (e && str.startsWith(e)) { if (!firstE) firstE = e; str = str.slice(e.length).replace(/^[\s\u2503|\uFF5C·:_-]+/, ""); continue; }
+    if (/^[\u2503|\uFF5C·]/.test(str)) { str = str.replace(/^[\s\u2503|\uFF5C·]+/, ""); continue; }
+    break;
+  }
+  return { emoji: firstE, name: str.trim() };
+}
 export function channelLabel(ch: Ch): string {
-  const base = displayChannel(ch.raw, ch.type);
-  return ch.emoji ? `${ch.emoji}┃${base}` : base;
+  const stripped = stripEmojiPrefix(ch.raw);
+  const emoji = (ch.emoji && firstEmoji(ch.emoji)) || stripped.emoji;
+  const base = displayChannel(stripped.name, ch.type);
+  return emoji ? `${emoji}\u2503${base}` : base;
 }
 export function categoryLabel(cat: Cat): string {
-  return cat.emoji ? `${cat.emoji}┃${cat.name}` : cat.name;
+  const stripped = stripEmojiPrefix(cat.name);
+  const emoji = (cat.emoji && firstEmoji(cat.emoji)) || stripped.emoji;
+  return emoji ? `${emoji}\u2503 ${stripped.name}` : stripped.name;
 }

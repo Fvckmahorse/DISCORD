@@ -20,7 +20,7 @@ SEPARE NOME DE CONFIGURAÇÃO:
 
 CATEGORIA PRIVADA: private:true e liste em "allow" os cargos que podem ver. Não crie canais representando permissões.
 
-EMOJIS (quando o usuário pedir): é regra de FORMATAÇÃO. Escolha um emoji que combine com CADA nome. Preencha o campo "emoji" de cada categoria/canal (só o emoji, ex.: "📢"). O app junta como "emoji┃nome". Ex.: regras→📜, anúncios→📢, novidades→🆕, chat-geral→💬, memes→😂, sugestões→💡, ajuda→🆘, staff→🔒, informações→📚, comunidade→💬, gaming→🎮, voz→🔊. NUNCA coloque o texto da instrução como nome.
+EMOJIS (quando o usuário pedir): é regra de FORMATAÇÃO. Escolha um emoji que combine com CADA nome. Preencha o campo "emoji" de cada categoria/canal (só o emoji, ex.: "📢"). O app junta como "emoji┃nome". Coloque EXATAMENTE UM emoji no campo "emoji" (só o emoji, sem "┃" e sem repetir). NUNCA inclua emoji nem "┃" dentro de "name" — o nome é só o texto (ex.: name:"anúncios", emoji:"📢"). Ex.: regras→📜, anúncios→📢, novidades→🆕, chat-geral→💬, memes→😂, sugestões→💡, ajuda→🆘, staff→🔒, informações→📚, comunidade→💬, gaming→🎮, voz→🔊. NUNCA coloque o texto da instrução como nome.
 
 CARGOS: só os explicitamente pedidos. "hierarquia" indica a ORDEM (de cima pra baixo), não é um cargo.
 
