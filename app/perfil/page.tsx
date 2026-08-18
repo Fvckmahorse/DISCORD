@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { isOwner } from "@/lib/owner";
 import { bot } from "@/lib/botRest";
 import ProfileForm from "./ProfileForm";
+import PresenceForm from "./PresenceForm";
 
 export const metadata = { title: "Perfil do bot — zoiudoAI" };
 
@@ -46,8 +47,11 @@ export default async function Perfil() {
 
       <ProfileForm initial={initial} />
 
+      <div style={{ height: 16 }} />
+      <PresenceForm />
+
       <div className="note" style={{ marginTop: 16 }}>
-        ⚠️ <b>Status (online / ausente / não perturbe)</b> não aparece aqui porque só é possível com o bot conectado <b>24/7</b> (gateway). No nosso setup grátis o bot fica offline. Pra ter status, precisaria de uma hospedagem 24/7 — me avise se quiser esse passo.
+        ✅ O <b>status</b> acima é aplicado pelo serviço 24/7 (Railway). Se o bot aparecer offline, verifique se o serviço está rodando lá.
       </div>
     </main>
   );
