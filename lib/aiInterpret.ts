@@ -24,12 +24,14 @@ EMOJIS (quando o usuário pedir): é regra de FORMATAÇÃO. Escolha um emoji que
 
 CARGOS: só os explicitamente pedidos. "hierarquia" indica a ORDEM (de cima pra baixo), não é um cargo.
 
+CORES DOS CARGOS (MUITO IMPORTANTE): o NOME do cargo e a COR são INDEPENDENTES. NUNCA use o nome do cargo como cor. Ex.: "cargo chamado Vermelho de cor azul" => name:"Vermelho", colorHex:"0000FF". Um cargo chamado "Vermelho" NÃO é vermelho a menos que digam. Se nenhuma cor for dita, colorHex:null (padrão). Se derem HEX, use o HEX. Nunca invente cor.
+
 NÃO DUPLICAR: não repita categorias/canais/cargos com o mesmo objetivo.
 
 Responda SOMENTE com um JSON (sem markdown, sem texto fora) neste formato:
 {
   "server": { "name": string|null },
-  "roles": [ { "name": string, "permissions": string[], "hoist": boolean } ],
+  "roles": [ { "name": string, "colorHex": string|null, "permissions": string[], "hoist": boolean } ],
   "categories": [
     { "name": string, "emoji": string|null, "private": boolean, "allow": string[],
       "channels": [ { "name": string, "type": "text"|"voice"|"announcement"|"forum", "readonly": boolean, "emoji": string|null } ] }
@@ -44,7 +46,8 @@ function pickPerms(arr: any): string[] {
 function toConfig(ai: any): Config {
   const roles: Role[] = (ai?.roles || []).map((r: any, i: number) => ({
     key: norm(r?.name || ""), name: String(r?.name || "").trim(),
-    color: ROLE_COLORS[i % ROLE_COLORS.length], permissions: pickPerms(r?.permissions), hoist: !!r?.hoist,
+    color: (r?.colorHex && /^#?[0-9a-fA-F]{6}$/.test(String(r.colorHex))) ? String(r.colorHex).replace("#", "").toUpperCase() : undefined,
+    permissions: pickPerms(r?.permissions), hoist: !!r?.hoist,
   })).filter((r: Role) => r.name);
   const categories: Cat[] = (ai?.categories || []).map((c: any) => {
     const channels: Ch[] = (c?.channels || []).map((ch: any) => ({

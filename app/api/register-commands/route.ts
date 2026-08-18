@@ -1,53 +1,31 @@
 import { auth } from "@/auth";
 import { isOwner } from "@/lib/owner";
-import { FUN_COMMANDS } from "@/lib/funCommands";
-import { MOD_COMMANDS } from "@/lib/modCommands";
+import { registerGlobal, allCommandDefs } from "@/lib/registry";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   const session = await auth();
-  if (!session?.user) return Response.json({ error: "Faça login no site primeiro." }, { status: 401 });
-  if (!isOwner(session)) return Response.json({ error: "Apenas o dono pode registrar comandos." }, { status: 403 });
+  if (!session?.user) return Response.json({ error: "Faça login primeiro." }, { status: 401 });
+  if (!isOwner(session)) return Response.json({ error: "Apenas o dono." }, { status: 403 });
 
-  const appId = process.env.AUTH_DISCORD_ID;
-  const botToken = process.env.DISCORD_BOT_TOKEN;
-  if (!appId || !botToken) return Response.json({ error: "Faltam AUTH_DISCORD_ID ou DISCORD_BOT_TOKEN na Vercel." }, { status: 500 });
+  const appId = process.env.AUTH_DISCORD_ID, botToken = process.env.DISCORD_BOT_TOKEN;
+  if (!appId || !botToken) return Response.json({ error: "Faltam AUTH_DISCORD_ID/DISCORD_BOT_TOKEN." }, { status: 500 });
 
   const url = new URL(req.url);
-  const clear = url.searchParams.get("clear"); // id do servidor pra limpar (remove duplicados)
+  const clear = url.searchParams.get("clear");
   if (clear) {
     const res = await fetch(`https://discord.com/api/v10/applications/${appId}/guilds/${clear}/commands`, {
-      method: "PUT",
-      headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
-      body: "[]",
+      method: "PUT", headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" }, body: "[]",
     });
-    return Response.json({ ok: res.ok, status: res.status,
-      message: res.ok ? "✓ Comandos DESTE servidor removidos. Sobraram só os globais (sem duplicatas)." : `Falha ao limpar (${res.status}).` });
+    return Response.json({ ok: res.ok, message: res.ok ? "✓ Comandos DESTE servidor removidos (duplicados). Ficam só os globais." : `Falha (${res.status}).` });
   }
 
   const guild = url.searchParams.get("guild");
+  const defs = await allCommandDefs();
   const endpoint = guild
     ? `https://discord.com/api/v10/applications/${appId}/guilds/${guild}/commands`
     : `https://discord.com/api/v10/applications/${appId}/commands`;
-
-  const funCommands = FUN_COMMANDS.map((c) => ({
-    name: c.name,
-    description: (c.description || `Descobre quantos % ${c.adjective} alguém é`).slice(0, 100),
-    options: [{ type: 6, name: "alvo", description: "Quem você quer medir?", required: true }],
-  }));
-  const commands = [...funCommands, ...MOD_COMMANDS];
-
-  const res = await fetch(endpoint, {
-    method: "PUT",
-    headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(commands),
-  });
-  const data = await res.json().catch(() => ({}));
-  return Response.json({
-    ok: res.ok, status: res.status,
-    registered: Array.isArray(data) ? data.length : 0,
-    scope: guild ? `servidor ${guild} (instantâneo)` : "global (pode levar até 1h pra aparecer)",
-    data,
-  });
+  const res = await fetch(endpoint, { method: "PUT", headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" }, body: JSON.stringify(defs) });
+  return Response.json({ ok: res.ok, status: res.status, registered: defs.length, scope: guild ? `servidor ${guild} (instantâneo)` : "global (até 1h)" });
 }

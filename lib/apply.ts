@@ -66,7 +66,7 @@ export async function applyConfig(guildId: string, config: Config, token: string
     if (exists) { keyToRoleId[role.key] = exists.id; log.push(`• Cargo já existia: ${role.name}`); continue; }
     try {
       const r = await dapi(`/guilds/${guildId}/roles`, "POST", {
-        name: role.name, color: hexToInt(role.color), hoist: role.hoist,
+        name: role.name, color: role.color ? hexToInt(role.color) : 0, hoist: role.hoist,
         permissions: permsToBits(role.permissions), reason: "zoiudoAI",
       } as any, token, log);
       keyToRoleId[role.key] = r.id; roleByName.set(nkey(role.name), r);

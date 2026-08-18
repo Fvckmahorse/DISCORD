@@ -1,17 +1,32 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+const PERMS = [
+  { label: "Todos podem usar", value: "" },
+  { label: "Só quem tem Gerenciar Mensagens", value: "8192" },
+  { label: "Só Administradores", value: "8" },
+  { label: "Só quem pode Moderar Membros", value: "1099511627776" },
+];
 
 export default function CommandCreator() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [type, setType] = useState("percent");
+  const [perm, setPerm] = useState("");
   const [resp, setResp] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [guild, setGuild] = useState("");
   const [adminMsg, setAdminMsg] = useState<string | null>(null);
   const [adminBusy, setAdminBusy] = useState(false);
+  const [customs, setCustoms] = useState<any[]>([]);
+  const [ready, setReady] = useState(true);
+
+  async function load() {
+    try { const r = await fetch("/api/commands/create"); const d = await r.json(); setCustoms(d.commands || []); setReady(d.ready !== false); } catch {}
+  }
+  useEffect(() => { load(); }, []);
 
   async function sync(clear: boolean) {
     setAdminBusy(true); setAdminMsg(null);
@@ -23,60 +38,80 @@ export default function CommandCreator() {
     } catch (e: any) { setAdminMsg("❌ " + (e?.message || "erro")); }
     finally { setAdminBusy(false); }
   }
-
   async function create() {
     setBusy(true); setMsg(null);
     try {
-      const res = await fetch("/api/commands/create", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim().toLowerCase(), description: desc.trim(), type, response: resp.trim() }),
-      });
+      const res = await fetch("/api/commands/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, description: desc, type, response: resp, permission: perm || null }) });
       const data = await res.json();
       setMsg((data.ok ? "✓ " : "⚠️ ") + data.message);
+      if (data.ok) { setName(""); setDesc(""); setResp(""); load(); }
     } catch (e: any) { setMsg("❌ " + (e?.message || "erro")); }
     finally { setBusy(false); }
   }
+  async function remove(n: string) {
+    if (!confirm(`Excluir /${n}?`)) return;
+    await fetch(`/api/commands/create?name=${encodeURIComponent(n)}`, { method: "DELETE" });
+    load();
+  }
+
+  const respLabel = type === "percent" ? "Adjetivo (ex.: gostoso)" : type === "random" ? "Frases (uma por linha)" : type === "action" ? "Ação (ex.: deu um abraço em)" : "Texto fixo";
+  const respPh = type === "percent" ? "gostoso" : type === "random" ? "Frase 1\nFrase 2\nFrase 3" : type === "action" ? "deu um abraço em" : "Sua mensagem. Use {user} (quem usou) e {alvo}.";
 
   return (
     <div>
       <div className="creator" style={{ marginTop: 0, marginBottom: 12 }}>
         <div className="step-k">registro & duplicados</div>
-        <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>Os comandos já se registram sozinhos a cada deploy. Use os botões abaixo só se precisar forçar, ou pra tirar duplicatas.</p>
-        <div className="row" style={{ marginTop: 8 }}>
-          <button className="btn btn-ghost" disabled={adminBusy} onClick={() => sync(false)}>🔄 Sincronizar (global)</button>
-        </div>
-        <label style={{ marginTop: 12 }}>Remover duplicados de um servidor (cole o ID)</label>
-        <div className="row">
-          <input value={guild} onChange={e => setGuild(e.target.value)} placeholder="ID do servidor" style={{ flex: 1 }} />
-          <button className="btn btn-ghost" disabled={adminBusy || !guild.trim()} onClick={() => sync(true)}>🧹 Limpar duplicados</button>
-        </div>
+        <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>Os comandos se registram sozinhos a cada deploy. Use abaixo só se precisar forçar ou tirar duplicatas.</p>
+        <div className="row" style={{ marginTop: 8 }}><button className="btn btn-ghost" disabled={adminBusy} onClick={() => sync(false)}>🔄 Sincronizar (global)</button></div>
+        <label style={{ marginTop: 12 }}>Remover duplicados de um servidor (ID)</label>
+        <div className="row"><input value={guild} onChange={e => setGuild(e.target.value)} placeholder="ID do servidor" style={{ flex: 1 }} /><button className="btn btn-ghost" disabled={adminBusy || !guild.trim()} onClick={() => sync(true)}>🧹 Limpar</button></div>
         {adminMsg && <div className="note" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>{adminMsg}</div>}
       </div>
 
       <div className="cmd-toolbar">
-        <div className="muted" style={{ fontSize: 13 }}>Crie um comando de resposta personalizada.</div>
+        <div className="muted" style={{ fontSize: 13 }}>{ready ? "Crie comandos de resposta personalizada." : "⚠️ Conecte o banco (Upstash) na Vercel pra criar comandos."}</div>
         <button className="btn btn-primary" onClick={() => setOpen(!open)}>＋ Criar comando</button>
       </div>
+
       {open && (
         <div className="creator">
-          <div className="step-k">novo comando personalizado</div>
-          <label>Nome (só letras minúsculas, sem espaços)</label>
-          <input value={name} onChange={e => setName(e.target.value.replace(/[^a-z0-9_-]/g, ""))} placeholder="ex.: gostoso" />
+          <div className="step-k">novo comando</div>
+          <label>Nome (minúsculas, sem espaços)</label>
+          <input value={name} onChange={e => setName(e.target.value.replace(/[^a-z0-9_-]/g, ""))} placeholder="gostoso" />
           <label>Descrição</label>
-          <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="ex.: Descobre quantos % gostoso alguém é" />
+          <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descobre quantos % gostoso alguém é" />
           <label>Tipo de resposta</label>
           <select value={type} onChange={e => setType(e.target.value)}>
-            <option value="percent">Porcentagem aleatória (ex.: @user é 73% gostoso)</option>
-            <option value="random">Frase aleatória (uma da lista, sorteada)</option>
-            <option value="fixed">Texto fixo (responde sempre igual)</option>
+            <option value="percent">Porcentagem aleatória (@user é X% ...)</option>
+            <option value="random">Frase aleatória (sorteia da lista)</option>
+            <option value="fixed">Texto fixo (sempre igual)</option>
+            <option value="action">Ação/roleplay (@user deu ... em @alvo)</option>
           </select>
-          <label>{type === "percent" ? "Adjetivo (ex.: gostoso)" : type === "random" ? "Frases (uma por linha)" : "Texto da resposta"}</label>
-          <textarea value={resp} onChange={e => setResp(e.target.value)} placeholder={type === "percent" ? "gostoso" : type === "random" ? "Frase 1\nFrase 2\nFrase 3" : "Sua mensagem aqui. Use {user} para marcar quem usou."} />
+          <label>Quem pode usar</label>
+          <select value={perm} onChange={e => setPerm(e.target.value)}>{PERMS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}</select>
+          <label>{respLabel}</label>
+          <textarea value={resp} onChange={e => setResp(e.target.value)} placeholder={respPh} />
           <div className="row" style={{ marginTop: 12 }}>
             <button className="btn btn-primary" onClick={create} disabled={busy || !name || !desc}>{busy ? "Criando…" : "Criar e registrar"}</button>
             <button className="btn btn-ghost" onClick={() => setOpen(false)}>Cancelar</button>
           </div>
-          {msg && <div className="note" style={{ marginTop: 12 }}>{msg}</div>}
+          {msg && <div className="note" style={{ marginTop: 12, whiteSpace: "pre-wrap" }}>{msg}</div>}
+        </div>
+      )}
+
+      {customs.length > 0 && (
+        <div className="cmd-category" style={{ ["--cat" as any]: "#43b581", marginTop: 16 }}>
+          <div className="cmd-category-header"><span className="cat-emoji">✨</span><div><h2>Seus comandos</h2><p>Comandos personalizados que você criou.</p></div><span className="count">{customs.length}</span></div>
+          <div className="cmd-list">
+            {customs.map((c) => (
+              <div className="cmd-entry" key={c.name}>
+                <div className="command-entry-label"><span className="cmd-pill">/{c.name}</span></div>
+                <div className="cmd-desc">{c.description}</div>
+                <div className="cmd-meta"><span className="tagp">{c.type}</span><span className="tagp">{c.permission ? "restrito" : "todos"}</span>
+                  <button className="btn btn-ghost" style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => remove(c.name)}>excluir</button></div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

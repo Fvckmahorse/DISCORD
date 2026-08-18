@@ -2,7 +2,7 @@
 
 export type Ch = { raw: string; type: "text" | "voice" | "announcement" | "forum"; readonly: boolean; emoji?: string };
 export type Cat = { name: string; private: boolean; allow: string[]; channels: Ch[]; emoji?: string };
-export type Role = { key: string; name: string; color: string; permissions: string[]; hoist: boolean };
+export type Role = { key: string; name: string; color?: string; permissions: string[]; hoist: boolean };
 export type Config = { server: { name: string }; roles: Role[]; categories: Cat[] };
 export type Result = { config: Config; warnings: string[]; blocks: string[]; applied: string[] };
 
@@ -29,6 +29,33 @@ const PERM_RULES: { re: RegExp; perm: string }[] = [
   { re:/(mencionar|marcar) (o )?@?everyone/, perm:"MENTION_EVERYONE" },
   { re:/(gerenciar|configurar) (o )?servidor/, perm:"MANAGE_GUILD" },
 ];
+
+import { nameToHex, colorLine } from "./colors";
+
+function nameToHexLocal(n: string): string | null { return nameToHex(n); }
+
+export const PERM_PT: Record<string, string> = {
+  ADMINISTRATOR: "Administrador", MANAGE_MESSAGES: "Gerenciar mensagens", MODERATE_MEMBERS: "Moderar membros",
+  BAN_MEMBERS: "Banir membros", KICK_MEMBERS: "Expulsar membros", MANAGE_CHANNELS: "Gerenciar canais",
+  MANAGE_ROLES: "Gerenciar cargos", ATTACH_FILES: "Anexar arquivos", MENTION_EVERYONE: "Mencionar everyone",
+  MANAGE_GUILD: "Gerenciar servidor",
+};
+
+/** Prévia de cargos em texto limpo, no formato pedido. */
+export function renderRolesText(roles: Role[]): string {
+  if (!roles.length) return "";
+  let out = "CARGOS\n";
+  roles.forEach((r, i) => {
+    out += `\n${i + 1}. ${r.name}\n`;
+    out += `Cor: ${colorLine(r.color)}\n`;
+    if (r.permissions.includes("ADMINISTRATOR")) out += "Permissões: Administrador\n";
+    else if (r.permissions.length === 0) out += "Permissões: Padrão\n";
+    else { out += "Permissões:\n"; r.permissions.forEach(p => (out += `   * ${PERM_PT[p] || p}\n`)); }
+  });
+  out += "\nHIERARQUIA\n";
+  roles.forEach((r, i) => (out += `\n${i + 1}. ${r.name}`));
+  return out;
+}
 
 export const PERM_LABEL: Record<string,string> = {
   ADMINISTRATOR:"Administrador", MANAGE_MESSAGES:"Gerenciar msgs", MODERATE_MEMBERS:"Moderar",
@@ -88,7 +115,19 @@ export function interpret(text: string): Result {
   foundRoles.forEach(rname => {
     const key = norm(rname);
     if (!key || seen.has(key)) return; seen.add(key);
-    config.roles.push({ key, name:clean(rname), color:ROLE_COLORS[config.roles.length % ROLE_COLORS.length], permissions:[], hoist:false });
+    config.roles.push({ key, name:clean(rname), color:undefined, permissions:[], hoist:false });
+  });
+  // detecta cor especificada por cargo (nome e cor são independentes): "cargo X de cor azul", "cor #FF00FF"
+  config.roles.forEach(role => {
+    const vars = variantsFor(role.key);
+    sentences.forEach(sen => {
+      const s = norm(sen);
+      if (!vars.some(v => new RegExp("\\b"+v+"\\b").test(s)) && !s.includes(norm(role.name))) return;
+      const mHex = sen.match(/cor\s+(?:de\s+)?(#?[0-9a-fA-F]{6})\b/);
+      const mName = sen.match(/(?:de\s+)?cor\s+(?:de\s+)?["']?([a-zà-ú-]{3,20})/i);
+      if (mHex) role.color = mHex[1].replace("#","").toUpperCase();
+      else if (mName) { const hx = nameToHexLocal(mName[1]); if (hx) role.color = hx; }
+    });
   });
   config.roles.forEach(role => {
     const vars = variantsFor(role.key);

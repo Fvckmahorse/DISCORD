@@ -1,7 +1,7 @@
 "use client";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { channelLabel, categoryLabel, PERM_LABEL, type Result } from "@/lib/interpret";
+import { channelLabel, categoryLabel, PERM_LABEL, renderRolesText, type Result } from "@/lib/interpret";
 
 const ICON: Record<string,string> = { text:"#", voice:"🔊", announcement:"📢", forum:"💬" };
 
@@ -104,16 +104,7 @@ function BuildInner() {
           {cfg.roles.length > 0 && (
             <>
               <div className="step-k" style={{ marginTop: 18 }}>cargos</div>
-              <div className="roles">
-                {cfg.roles.map((r, i) => (
-                  <div className="role" key={i}>
-                    <span className="swatch" style={{ background:r.color }}></span><span className="rn">{r.name}</span>
-                    <span className="perms">
-                      {r.permissions.length ? r.permissions.map((p,k)=><span key={k} className={"perm"+(p==="ADMINISTRATOR"?" admin":"")}>{PERM_LABEL[p]||p}</span>) : <span className="perm none">padrão</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <pre style={{ margin: "8px 0 0", padding: 14, background: "var(--ink)", border: "1px solid var(--line)", borderRadius: 10, fontFamily: "var(--mono)", fontSize: 13, color: "#e7e9f1", whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{renderRolesText(cfg.roles)}</pre>
             </>
           )}
 

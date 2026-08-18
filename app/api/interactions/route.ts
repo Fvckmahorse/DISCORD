@@ -1,6 +1,7 @@
 import nacl from "tweetnacl";
 import { FUN_COMMANDS, buildResponse } from "@/lib/funCommands";
 import { handleMod } from "@/lib/modHandlers";
+import { getCustom, buildCustomResponse } from "@/lib/customCommands";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,12 @@ export async function POST(req: Request) {
     // 3b) comandos divertidos
     const name = body.data?.name;
     const cmd = FUN_COMMANDS.find((c) => c.name === name);
-    if (!cmd) return Response.json({ type: 4, data: { content: "Comando desconhecido." } });
+    if (!cmd) {
+      // 3c) comandos personalizados (banco)
+      const custom = await getCustom(name);
+      if (custom) return Response.json({ type: 4, data: { content: buildCustomResponse(custom, body), allowed_mentions: { parse: ["users"] } } });
+      return Response.json({ type: 4, data: { content: "Comando desconhecido." } });
+    }
 
     const opt = (body.data?.options || []).find((o: any) => o.name === "alvo");
     const targetId = opt?.value || body.member?.user?.id || body.user?.id;
