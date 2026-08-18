@@ -1,7 +1,7 @@
 import nacl from "tweetnacl";
 import { FUN_COMMANDS, buildResponse } from "@/lib/funCommands";
 import { handleMod } from "@/lib/modHandlers";
-import { getCustom, buildCustomResponse } from "@/lib/customCommands";
+import { getCustom, buildCustomInteraction } from "@/lib/customCommands";
 
 export const runtime = "nodejs";
 
@@ -40,7 +40,24 @@ export async function POST(req: Request) {
     if (!cmd) {
       // 3c) comandos personalizados (banco)
       const custom = await getCustom(name);
-      if (custom) return Response.json({ type: 4, data: { content: buildCustomResponse(custom, body), allowed_mentions: { parse: ["users"] } } });
+      if (custom) {
+        // imagem anexada (data URI) -> envia como arquivo (multipart)
+        if (custom.type === "image" && custom.image && custom.image.startsWith("data:")) {
+          const m = custom.image.match(/^data:(.+?);base64,(.*)$/);
+          if (m) {
+            const mime = m[1], bytes = Buffer.from(m[2], "base64");
+            const ext = (mime.split("/")[1] || "png").replace("+xml", "");
+            const caller = body.member?.user?.id || body.user?.id;
+            const text = (custom.data || "").replace(/\{user\}/g, `<@${caller}>`);
+            const payload = { type: 4, data: { content: text || undefined, attachments: [{ id: 0, filename: `img.${ext}` }], allowed_mentions: { parse: ["users"] } } };
+            const fd = new FormData();
+            fd.append("payload_json", JSON.stringify(payload));
+            fd.append("files[0]", new Blob([bytes], { type: mime }), `img.${ext}`);
+            return new Response(fd);
+          }
+        }
+        return Response.json({ type: 4, data: buildCustomInteraction(custom, body) });
+      }
       return Response.json({ type: 4, data: { content: "Comando desconhecido." } });
     }
 

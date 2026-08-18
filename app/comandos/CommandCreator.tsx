@@ -15,6 +15,8 @@ export default function CommandCreator() {
   const [type, setType] = useState("percent");
   const [perm, setPerm] = useState("");
   const [resp, setResp] = useState("");
+  const [image, setImage] = useState("");
+  const [imgName, setImgName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [guild, setGuild] = useState("");
@@ -41,10 +43,10 @@ export default function CommandCreator() {
   async function create() {
     setBusy(true); setMsg(null);
     try {
-      const res = await fetch("/api/commands/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, description: desc, type, response: resp, permission: perm || null }) });
+      const res = await fetch("/api/commands/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, description: desc, type, response: resp, permission: perm || null, image }) });
       const data = await res.json();
       setMsg((data.ok ? "✓ " : "⚠️ ") + data.message);
-      if (data.ok) { setName(""); setDesc(""); setResp(""); load(); }
+      if (data.ok) { setName(""); setDesc(""); setResp(""); setImage(""); setImgName(""); load(); }
     } catch (e: any) { setMsg("❌ " + (e?.message || "erro")); }
     finally { setBusy(false); }
   }
@@ -86,11 +88,30 @@ export default function CommandCreator() {
             <option value="random">Frase aleatória (sorteia da lista)</option>
             <option value="fixed">Texto fixo (sempre igual)</option>
             <option value="action">Ação/roleplay (@user deu ... em @alvo)</option>
+            <option value="image">Imagem (manda uma foto + texto)</option>
           </select>
           <label>Quem pode usar</label>
           <select value={perm} onChange={e => setPerm(e.target.value)}>{PERMS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}</select>
-          <label>{respLabel}</label>
-          <textarea value={resp} onChange={e => setResp(e.target.value)} placeholder={respPh} />
+          {type === "image" ? (
+            <>
+              <label>Imagem — anexe um arquivo</label>
+              <input type="file" accept="image/*" onChange={e => {
+                const f = e.target.files?.[0]; if (!f) return;
+                if (f.size > 350 * 1024) { setMsg("⚠️ Imagem muito grande (máx. ~350KB). Use uma menor ou cole uma URL."); return; }
+                const r = new FileReader(); r.onload = () => { setImage(String(r.result)); setImgName(f.name); }; r.readAsDataURL(f);
+              }} />
+              {imgName && <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>Anexado: {imgName}</div>}
+              <label>…ou cole uma URL de imagem</label>
+              <input value={image.startsWith("data:") ? "" : image} onChange={e => { setImage(e.target.value); setImgName(""); }} placeholder="https://.../foto.png" />
+              <label>Texto (opcional) — aparece junto da imagem</label>
+              <textarea value={resp} onChange={e => setResp(e.target.value)} placeholder="macarrão com salsicha" />
+            </>
+          ) : (
+            <>
+              <label>{respLabel}</label>
+              <textarea value={resp} onChange={e => setResp(e.target.value)} placeholder={respPh} />
+            </>
+          )}
           <div className="row" style={{ marginTop: 12 }}>
             <button className="btn btn-primary" onClick={create} disabled={busy || !name || !desc}>{busy ? "Criando…" : "Criar e registrar"}</button>
             <button className="btn btn-ghost" onClick={() => setOpen(false)}>Cancelar</button>

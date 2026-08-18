@@ -25,8 +25,14 @@ export async function POST(req: Request) {
   if (!name || name.length > 32) return Response.json({ ok: false, message: "Nome inválido (1–32, só letras/números)." });
   const reserved = new Set([...FUN_COMMANDS.map((c: any) => c.name), ...MOD_COMMANDS.map((c: any) => c.name)]);
   if (reserved.has(name)) return Response.json({ ok: false, message: `"/${name}" já é um comando fixo do bot.` });
-  const type = ["percent", "random", "fixed", "action"].includes(b.type) ? b.type : "fixed";
-  const cmd: CustomCommand = { name, description: String(b.description || name).slice(0, 100), type, data: String(b.response || ""), permission: b.permission || null };
+  const type = ["percent", "random", "fixed", "action", "image"].includes(b.type) ? b.type : "fixed";
+  const image = typeof b.image === "string" ? b.image.trim() : "";
+  if (type === "image") {
+    if (!image) return Response.json({ ok: false, message: "Anexe uma imagem ou cole uma URL de imagem." });
+    if (image.startsWith("data:") && image.length > 500000) return Response.json({ ok: false, message: "Imagem muito grande (máx. ~350KB). Use uma menor ou cole uma URL." });
+    if (!image.startsWith("data:") && !/^https?:\/\//.test(image)) return Response.json({ ok: false, message: "URL de imagem inválida." });
+  }
+  const cmd: CustomCommand = { name, description: String(b.description || name).slice(0, 100), type, data: String(b.response || ""), permission: b.permission || null, image: type === "image" ? image : undefined };
   await saveCustom(cmd);
   try { const r = await registerGlobal(); return Response.json({ ok: true, message: `✓ /${name} criado e registrado! (${r.count} comandos). Global pode levar até 1h pra aparecer.` }); }
   catch (e: any) { return Response.json({ ok: true, message: `Salvo, mas falha ao registrar agora: ${e?.message}. Use "Sincronizar" depois.` }); }
