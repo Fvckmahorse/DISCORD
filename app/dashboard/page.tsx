@@ -31,6 +31,7 @@ export default async function Dashboard() {
         <div className="row">
           <a className="btn btn-ghost" href="/comandos">Comandos</a>
           <a className="btn btn-ghost" href="/perfil">Perfil</a>
+          <a className="btn btn-ghost" href="/welcome">Boas-vindas</a>
           <span className="pill">olá, {session.user.name?.split(" ")[0] ?? "você"}</span>
           <SignOutButton />
         </div>
