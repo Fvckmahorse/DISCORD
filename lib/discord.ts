@@ -64,3 +64,15 @@ export function addBotUrl(guildId?: string): string {
   }
   return `https://discord.com/oauth2/authorize?${params.toString()}`;
 }
+
+/** Verifica se o NOSSO bot já está num servidor (via bot token). */
+export async function botInGuild(guildId: string): Promise<boolean> {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) return false;
+  try {
+    const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}`, {
+      headers: { Authorization: `Bot ${token}` },
+    });
+    return res.ok; // 200 = bot está no servidor; 403/404 = não está
+  } catch { return false; }
+}

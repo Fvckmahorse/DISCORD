@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { DiscordButton, SignOutButton } from "@/components/AuthButtons";
-import { listUserGuilds, canManage, iconUrl, addBotUrl, type Guild } from "@/lib/discord";
+import { listUserGuilds, canManage, iconUrl, addBotUrl, botInGuild, type Guild } from "@/lib/discord";
 
 export default async function Dashboard() {
   const session = await auth();
@@ -12,8 +12,14 @@ export default async function Dashboard() {
 
   let guilds: Guild[] = [];
   let error: string | null = null;
+  let botIn: Record<string, boolean> = {};
   if (discordConnected && token) {
-    try { guilds = (await listUserGuilds(token)).filter(canManage); }
+    try {
+      guilds = (await listUserGuilds(token)).filter(canManage);
+      // checa em quais desses o bot já está (em paralelo)
+      const checks = await Promise.all(guilds.map((g) => botInGuild(g.id)));
+      guilds.forEach((g, i) => { botIn[g.id] = checks[i]; });
+    }
     catch (e: any) {
       error = e?.message === "DISCORD_TOKEN_EXPIRED"
         ? "Sua conexão com o Discord expirou. Conecte novamente."
@@ -51,7 +57,7 @@ export default async function Dashboard() {
             <div className="step-k">seus servidores</div>
             <div className="row" style={{ justifyContent: "space-between" }}>
               <h1 style={{ fontSize: 22, margin: 0 }}>Onde você pode construir</h1>
-              <a className="btn btn-ghost" href={addBotUrl()}>+ Adicionar o bot em outro</a>
+              <a className="btn btn-ghost" href={addBotUrl()} target="_blank" rel="noopener noreferrer">+ Adicionar o bot em outro</a>
             </div>
 
             {error && <div className="note" style={{ marginTop: 14 }}>⚠️ {error} <DiscordButton label="Reconectar Discord" /></div>}
@@ -65,19 +71,27 @@ export default async function Dashboard() {
                   <div className="ic">{iconUrl(g) ? <img src={iconUrl(g)!} alt="" /> : (g.name?.[0] ?? "?").toUpperCase()}</div>
                   <div style={{ minWidth: 0 }}>
                     <div className="gn">{g.name}</div>
-                    <div className="role">{g.owner ? "você é dono" : "você gerencia"}</div>
+                    <div className="role">{botIn[g.id] ? (g.owner ? "você é dono · bot ativo" : "você gerencia · bot ativo") : "bot ainda não adicionado"}</div>
                   </div>
                   <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
-                    <a className="btn btn-ghost add" href={addBotUrl(g.id)}>Add bot</a>
-                    <a className="btn btn-primary add" href={`/build?guild=${g.id}&name=${encodeURIComponent(g.name)}`}>Construir →</a>
+                    {botIn[g.id] ? (
+                      <a className="btn btn-primary add" href={`/build?guild=${g.id}&name=${encodeURIComponent(g.name)}`}>Construir →</a>
+                    ) : (
+                      <a className="btn btn-primary add" href={addBotUrl(g.id)} target="_blank" rel="noopener noreferrer">+ Add bot</a>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
+            {guilds.some((g) => !botIn[g.id]) && (
+              <div className="faint" style={{ fontSize: 12, marginTop: 12 }}>
+                Depois de adicionar o bot na aba que abriu, volte aqui e <a href="/dashboard" style={{ color: "var(--accent)" }}>atualize a página</a> — o botão “Construir” vai aparecer.
+              </div>
+            )}
           </div>
 
           <div className="note">
-            Dica: se o servidor ainda não tem o bot, clique em “Add bot” primeiro. Depois “Construir”.
+            Dica: nos servidores sem o bot, aparece só o <b>“+ Add bot”</b> (abre numa aba nova). Depois de adicionar, volte e atualize — aí surge o <b>“Construir”</b>.
           </div>
         </>
       )}
