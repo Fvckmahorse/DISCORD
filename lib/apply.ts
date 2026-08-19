@@ -46,10 +46,14 @@ async function dapi(path: string, method: string, body: any, token: string, log:
 
 export type ApplyResult = { log: string[]; errors: string[]; created: { roles: number; categories: number; channels: number } };
 
-export async function applyConfig(guildId: string, config: Config, token: string): Promise<ApplyResult> {
+export async function applyConfig(guildId: string, config: Config, token: string, onProgress?: (done: number, total: number, message: string) => void): Promise<ApplyResult> {
   const log: string[] = [], errors: string[] = [];
   const created = { roles: 0, categories: 0, channels: 0 };
   const keyToRoleId: Record<string,string> = {};
+
+  const total = config.roles.length + config.categories.length + config.categories.reduce((s, c) => s + c.channels.length, 0);
+  let done = 0;
+  const tick = (message: string) => { done++; try { onProgress?.(done, total, message); } catch {} };
 
   const nkey = (s: string) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
@@ -63,7 +67,7 @@ export async function applyConfig(guildId: string, config: Config, token: string
   // 1) cargos
   for (const role of config.roles) {
     const exists = roleByName.get(nkey(role.name));
-    if (exists) { keyToRoleId[role.key] = exists.id; log.push(`• Cargo já existia: ${role.name}`); continue; }
+    if (exists) { keyToRoleId[role.key] = exists.id; log.push(`• Cargo já existia: ${role.name}`); tick(`Cargo: ${role.name}`); continue; }
     try {
       const r = await dapi(`/guilds/${guildId}/roles`, "POST", {
         name: role.name, color: role.color ? hexToInt(role.color) : 0, hoist: role.hoist,
@@ -72,6 +76,7 @@ export async function applyConfig(guildId: string, config: Config, token: string
       keyToRoleId[role.key] = r.id; roleByName.set(nkey(role.name), r);
       created.roles++; log.push(`✓ Cargo criado: ${role.name}`);
     } catch (e: any) { errors.push(`Cargo "${role.name}": ${e.message}`); }
+    tick(`Cargo: ${role.name}`);
   }
 
   // 2) categorias + 3) canais
@@ -90,12 +95,13 @@ export async function applyConfig(guildId: string, config: Config, token: string
       try {
         const c = await dapi(`/guilds/${guildId}/channels`, "POST", { name: catLabel, type: CH_TYPE.category, permission_overwrites: overwrites } as any, token, log);
         categoryId = c.id; created.categories++; log.push(`✓ Categoria criada: ${catLabel}`);
-      } catch (e: any) { errors.push(`Categoria "${cat.name}": ${e.message}`); continue; }
+      } catch (e: any) { errors.push(`Categoria "${cat.name}": ${e.message}`); tick(`Categoria: ${catLabel}`); for (const _c of cat.channels) tick("(pulado)"); continue; }
     }
+    tick(`Categoria: ${catLabel}`);
 
     for (const ch of cat.channels) {
       const chLabel = channelLabel(ch);
-      if (chanByName.get(nkey(chLabel))) { log.push(`  • Canal já existia: ${chLabel}`); continue; }
+      if (chanByName.get(nkey(chLabel))) { log.push(`  • Canal já existia: ${chLabel}`); tick(`Canal: ${chLabel}`); continue; }
       const chOverwrites: any[] = [];
       if (ch.readonly) chOverwrites.push({ id: guildId, type: 0, deny: (BIT.SEND_MESSAGES | BIT.CREATE_PUBLIC_THREADS).toString() });
       try {
@@ -104,6 +110,7 @@ export async function applyConfig(guildId: string, config: Config, token: string
         } as any, token, log);
         chanByName.set(nkey(chLabel), nc); created.channels++;
       } catch (e: any) { errors.push(`Canal "${ch.raw}": ${e.message}`); }
+      tick(`Canal: ${chLabel}`);
     }
     log.push(`  ↳ ${cat.channels.length} canal(is) em ${catLabel}`);
   }

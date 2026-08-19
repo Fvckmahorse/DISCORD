@@ -19,6 +19,8 @@ function BuildInner() {
   const [confirming, setConfirming] = useState(false);
   const [log, setLog] = useState<string[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number; message: string } | null>(null);
+  const [elapsed, setElapsed] = useState<number | null>(null);
 
   async function build() {
     if (!text.trim()) return;
@@ -35,18 +37,44 @@ function BuildInner() {
   async function apply() {
     if (!result) return;
     setApplying(true); setErr(null); setLog(null); setConfirming(false);
+    setProgress({ done: 0, total: 0, message: "Iniciando…" }); setElapsed(null);
     try {
       const res = await fetch("/api/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ guildId, config: result.config }) });
-      const data = await res.json();
-      if (!res.ok) setErr(data.error || "Falha ao aplicar.");
-      else {
-        const l = [...data.log];
-        if (data.errors?.length) l.push("", "⚠️ Alguns itens falharam:", ...data.errors);
-        l.push("", `✓ Pronto: ${data.created.roles} cargos, ${data.created.categories} categorias, ${data.created.channels} canais.`);
-        setLog(l);
+      if (!res.ok || !res.body) {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.error || "Falha ao aplicar."); setApplying(false); setProgress(null); return;
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n"); buf = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let ev: any; try { ev = JSON.parse(line); } catch { continue; }
+          if (ev.type === "progress") setProgress({ done: ev.done, total: ev.total, message: ev.message });
+          else if (ev.type === "error") { setErr(ev.error); setElapsed(ev.ms ?? null); }
+          else if (ev.type === "done") {
+            const l = [...ev.log];
+            if (ev.errors?.length) l.push("", "⚠️ Alguns itens falharam:", ...ev.errors);
+            l.push("", `✓ Pronto: ${ev.created.roles} cargos, ${ev.created.categories} categorias, ${ev.created.channels} canais.`);
+            setLog(l); setElapsed(ev.ms ?? null);
+            setProgress((p) => (p ? { ...p, done: p.total || 1, total: p.total || 1, message: "Concluído" } : null));
+          }
+        }
       }
     } catch (e: any) { setErr(e?.message || "Erro de rede."); }
     finally { setApplying(false); }
+  }
+
+  function fmtTime(ms: number): string {
+    const s = ms / 1000;
+    if (s < 60) return `${s.toFixed(1)}s`;
+    const m = Math.floor(s / 60); const r = Math.round(s % 60);
+    return `${m}min ${r}s`;
   }
 
   const cfg = result?.config;
@@ -135,6 +163,25 @@ function BuildInner() {
           )}
 
           {err && <div className="note block" style={{ marginTop: 14 }}><span className="ic">✕</span><span>{err}</span></div>}
+          {progress && (progress.total > 0 || applying) && (
+            <div style={{ marginTop: 16 }}>
+              <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+                <span className="step-k" style={{ margin: 0 }}>{applying ? "criando no discord…" : "concluído"}</span>
+                <span className="faint" style={{ fontFamily: "var(--mono)", fontSize: 12 }}>
+                  {progress.total ? Math.round((progress.done / progress.total) * 100) : 0}% · {progress.done}/{progress.total}
+                </span>
+              </div>
+              <div className="progress"><span style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%` }} /></div>
+              {applying && <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>{progress.message}</div>}
+            </div>
+          )}
+
+          {elapsed != null && !applying && (
+            <div className="note" style={{ marginTop: 12, borderColor: "#57f28755", color: "var(--allow)" }}>
+              ⏱️ Servidor montado em <b style={{ marginLeft: 4 }}>{fmtTime(elapsed)}</b>
+            </div>
+          )}
+
           {log && <pre style={{ marginTop:14, padding:14, background:"var(--ink)", border:"1px solid var(--line)", borderRadius:10, fontFamily:"var(--mono)", fontSize:12.5, color:"#c9d1e6", whiteSpace:"pre-wrap" }}>{log.join("\n")}</pre>}
         </div>
       )}
