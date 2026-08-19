@@ -2,6 +2,8 @@ import nacl from "tweetnacl";
 import { FUN_COMMANDS, buildResponse } from "@/lib/funCommands";
 import { handleMod } from "@/lib/modHandlers";
 import { getCustom, buildCustomInteraction } from "@/lib/customCommands";
+import { getRegistro, applySelection } from "@/lib/registro";
+import { bot } from "@/lib/botRest";
 
 export const runtime = "nodejs";
 
@@ -71,6 +73,35 @@ export async function POST(req: Request) {
         allowed_mentions: { users: targetId ? [String(targetId)] : [] },
       },
     });
+  }
+
+  // 4) Interação de componente (menus do Registro)
+  if (body.type === 3) {
+    const customId: string = body.data?.custom_id || "";
+    if (customId.startsWith("reg:")) {
+      const catId = customId.slice(4);
+      const guildId = body.guild_id;
+      const cfg = await getRegistro(guildId);
+      const cat = cfg?.categories.find((c) => c.id === catId);
+      if (!cfg || !cat) return Response.json({ type: 4, data: { content: "Registro indisponível.", flags: 64 } });
+
+      const selected: string[] = body.data?.values || [];
+      const memberRoles: string[] = body.member?.roles || [];
+      const { roles, added, removed } = applySelection(cat, selected, memberRoles);
+
+      try {
+        await bot(`/guilds/${guildId}/members/${body.member.user.id}`, "PATCH", { roles });
+      } catch (e: any) {
+        return Response.json({ type: 4, data: { content: "❌ Não consegui alterar seus cargos. O bot precisa de **Gerenciar Cargos** e estar acima desses cargos.", flags: 64 } });
+      }
+
+      const parts: string[] = [];
+      if (added.length) parts.push("➕ " + added.map((r) => `<@&${r}>`).join(" "));
+      if (removed.length) parts.push("➖ " + removed.map((r) => `<@&${r}>`).join(" "));
+      const msg = parts.length ? parts.join("\n") : "Nada mudou.";
+      return Response.json({ type: 4, data: { content: `✅ **Registro atualizado!**\n${msg}`, flags: 64, allowed_mentions: { parse: [] } } });
+    }
+    return Response.json({ type: 4, data: { content: "Interação desconhecida.", flags: 64 } });
   }
 
   return new Response("unhandled", { status: 400 });

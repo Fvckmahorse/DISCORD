@@ -36,23 +36,11 @@ export async function POST(req: NextRequest) {
   for (const c of config.categories) totalCh += c.channels.length;
   if (totalCh > 500) return NextResponse.json({ error: "Passou de 500 canais (limite do Discord)." }, { status: 400 });
 
-  // Resposta em streaming: manda o progresso conforme cria, e no fim o resultado + tempo.
-  const encoder = new TextEncoder();
   const start = Date.now();
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (obj: any) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
-      try {
-        const result = await applyConfig(guildId, config, botToken, (done, total, message) => {
-          send({ type: "progress", done, total, message });
-        });
-        send({ type: "done", ...result, ms: Date.now() - start });
-      } catch (e: any) {
-        send({ type: "error", error: e?.message ?? "Falha ao aplicar.", ms: Date.now() - start });
-      } finally {
-        controller.close();
-      }
-    },
-  });
-  return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache, no-transform" } });
+  try {
+    const result = await applyConfig(guildId, config, botToken);
+    return NextResponse.json({ ...result, ms: Date.now() - start });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message ?? "Falha ao aplicar." }, { status: 500 });
+  }
 }

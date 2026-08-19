@@ -36,37 +36,34 @@ function BuildInner() {
 
   async function apply() {
     if (!result) return;
-    setApplying(true); setErr(null); setLog(null); setConfirming(false);
-    setProgress({ done: 0, total: 0, message: "Iniciando…" }); setElapsed(null);
+    setApplying(true); setErr(null); setLog(null); setConfirming(false); setElapsed(null);
+    const cfg = result.config;
+    const total = cfg.roles.length + cfg.categories.length + cfg.categories.reduce((s: number, c: any) => s + c.channels.length, 0);
+    setProgress({ done: 0, total, message: "Criando no Discord…" });
+    const startedAt = Date.now();
+    const estMs = Math.max(1500, total * 260); // estimativa pra animar suave
+    const timer = setInterval(() => {
+      setProgress((p) => {
+        if (!p) return p;
+        const frac = Math.min(0.92, (Date.now() - startedAt) / estMs);
+        const done = Math.max(p.done, Math.floor(frac * p.total));
+        return { ...p, done };
+      });
+    }, 200);
     try {
-      const res = await fetch("/api/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ guildId, config: result.config }) });
-      if (!res.ok || !res.body) {
-        const d = await res.json().catch(() => ({}));
-        setErr(d.error || "Falha ao aplicar."); setApplying(false); setProgress(null); return;
+      const res = await fetch("/api/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ guildId, config: cfg }) });
+      const data = await res.json();
+      clearInterval(timer);
+      if (!res.ok) { setErr(data.error || "Falha ao aplicar."); setProgress(null); }
+      else {
+        const l = [...data.log];
+        if (data.errors?.length) l.push("", "⚠️ Alguns itens falharam:", ...data.errors);
+        l.push("", `✓ Pronto: ${data.created.roles} cargos, ${data.created.categories} categorias, ${data.created.channels} canais.`);
+        setLog(l);
+        setElapsed(data.ms ?? (Date.now() - startedAt));
+        setProgress({ done: total, total, message: "Concluído" });
       }
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const lines = buf.split("\n"); buf = lines.pop() || "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          let ev: any; try { ev = JSON.parse(line); } catch { continue; }
-          if (ev.type === "progress") setProgress({ done: ev.done, total: ev.total, message: ev.message });
-          else if (ev.type === "error") { setErr(ev.error); setElapsed(ev.ms ?? null); }
-          else if (ev.type === "done") {
-            const l = [...ev.log];
-            if (ev.errors?.length) l.push("", "⚠️ Alguns itens falharam:", ...ev.errors);
-            l.push("", `✓ Pronto: ${ev.created.roles} cargos, ${ev.created.categories} categorias, ${ev.created.channels} canais.`);
-            setLog(l); setElapsed(ev.ms ?? null);
-            setProgress((p) => (p ? { ...p, done: p.total || 1, total: p.total || 1, message: "Concluído" } : null));
-          }
-        }
-      }
-    } catch (e: any) { setErr(e?.message || "Erro de rede."); }
+    } catch (e: any) { clearInterval(timer); setErr(e?.message || "Erro de rede."); }
     finally { setApplying(false); }
   }
 
