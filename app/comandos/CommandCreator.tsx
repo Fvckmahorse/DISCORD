@@ -24,6 +24,19 @@ export default function CommandCreator() {
   const [adminBusy, setAdminBusy] = useState(false);
   const [customs, setCustoms] = useState<any[]>([]);
   const [ready, setReady] = useState(true);
+  const [editing, setEditing] = useState(false);
+
+  function startEdit(c: any) {
+    setEditing(true); setOpen(true);
+    setName(c.name); setDesc(c.description || ""); setType(c.type || "fixed");
+    setPerm(c.permission || ""); setResp(c.data || "");
+    setImage(c.image || ""); setImgName(c.image && c.image.startsWith("data:") ? "imagem salva" : "");
+    setMsg(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function resetForm() {
+    setEditing(false); setName(""); setDesc(""); setType("percent"); setPerm(""); setResp(""); setImage(""); setImgName(""); setMsg(null);
+  }
 
   async function load() {
     try { const r = await fetch("/api/commands/create"); const d = await r.json(); setCustoms(d.commands || []); setReady(d.ready !== false); } catch {}
@@ -46,7 +59,7 @@ export default function CommandCreator() {
       const res = await fetch("/api/commands/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, description: desc, type, response: resp, permission: perm || null, image }) });
       const data = await res.json();
       setMsg((data.ok ? "✓ " : "⚠️ ") + data.message);
-      if (data.ok) { setName(""); setDesc(""); setResp(""); setImage(""); setImgName(""); load(); }
+      if (data.ok) { resetForm(); load(); }
     } catch (e: any) { setMsg("❌ " + (e?.message || "erro")); }
     finally { setBusy(false); }
   }
@@ -71,15 +84,16 @@ export default function CommandCreator() {
       </div>
 
       <div className="cmd-toolbar">
-        <div className="muted" style={{ fontSize: 13 }}>{ready ? "Crie comandos de resposta personalizada." : "⚠️ Conecte o banco (Upstash) na Vercel pra criar comandos."}</div>
-        <button className="btn btn-primary" onClick={() => setOpen(!open)}>＋ Criar comando</button>
+        <div className="muted" style={{ fontSize: 13 }}>{ready ? "Crie ou edite comandos de resposta personalizada." : "⚠️ Conecte o banco (Upstash) na Vercel pra criar comandos."}</div>
+        <button className="btn btn-primary" onClick={() => { if (open) { resetForm(); setOpen(false); } else { setOpen(true); } }}>{open ? "Fechar" : "＋ Criar comando"}</button>
       </div>
 
       {open && (
         <div className="creator">
-          <div className="step-k">novo comando</div>
+          <div className="step-k">{editing ? `editando /${name}` : "novo comando"}</div>
           <label>Nome (minúsculas, sem espaços)</label>
-          <input value={name} onChange={e => setName(e.target.value.replace(/[^a-z0-9_-]/g, ""))} placeholder="gostoso" />
+          <input value={name} disabled={editing} onChange={e => setName(e.target.value.replace(/[^a-z0-9_-]/g, ""))} placeholder="gostoso" style={editing ? { opacity: .6 } : undefined} />
+          {editing && <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>Pra renomear, exclua e crie de novo (o nome é a identidade do comando).</div>}
           <label>Descrição</label>
           <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descobre quantos % gostoso alguém é" />
           <label>Tipo de resposta</label>
@@ -113,8 +127,8 @@ export default function CommandCreator() {
             </>
           )}
           <div className="row" style={{ marginTop: 12 }}>
-            <button className="btn btn-primary" onClick={create} disabled={busy || !name || !desc}>{busy ? "Criando…" : "Criar e registrar"}</button>
-            <button className="btn btn-ghost" onClick={() => setOpen(false)}>Cancelar</button>
+            <button className="btn btn-primary" onClick={create} disabled={busy || !name || !desc}>{busy ? "Salvando…" : editing ? "Salvar alterações" : "Criar e registrar"}</button>
+            <button className="btn btn-ghost" onClick={() => { resetForm(); setOpen(false); }}>Cancelar</button>
           </div>
           {msg && <div className="note" style={{ marginTop: 12, whiteSpace: "pre-wrap" }}>{msg}</div>}
         </div>
@@ -129,6 +143,7 @@ export default function CommandCreator() {
                 <div className="command-entry-label"><span className="cmd-pill">/{c.name}</span></div>
                 <div className="cmd-desc">{c.description}</div>
                 <div className="cmd-meta"><span className="tagp">{c.type}</span><span className="tagp">{c.permission ? "restrito" : "todos"}</span>
+                  <button className="btn btn-ghost" style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => startEdit(c)}>editar</button>
                   <button className="btn btn-ghost" style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => remove(c.name)}>excluir</button></div>
               </div>
             ))}
