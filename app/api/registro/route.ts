@@ -49,19 +49,64 @@ export async function POST(req: Request) {
 
   if (b.action === "publish") {
     if (!cfg.channelId) return Response.json({ ok: false, message: "Escolha um canal para enviar o painel." });
+    if (!cfg.categories.length) return Response.json({ ok: false, message: "Adicione ao menos uma categoria antes de publicar." });
+
+    // ===== PRÉ-CHECAGENS (nada é criado ainda) =====
+    // 1) o canal existe e é do próprio servidor?
+    let channel: any;
     try {
-      cfg = await ensureRoles(guildId, cfg); // cria cargos que faltam
+      channel = await bot(`/channels/${cfg.channelId}`);
+      if (channel.guild_id && channel.guild_id !== guildId) return Response.json({ ok: false, message: "Esse canal não é deste servidor." });
+    } catch { return Response.json({ ok: false, message: "Não achei o canal (ele existe? o bot enxerga ele?)." }); }
+
+    // 2) o bot consegue mandar mensagem nesse canal? (teste real e reversível)
+    let testMsgId: string | null = null;
+    try {
+      const t = await bot(`/channels/${cfg.channelId}/messages`, "POST", { content: "⏳ Preparando o registro…" });
+      testMsgId = t.id;
+    } catch {
+      return Response.json({ ok: false, message: "O bot não consegue enviar mensagem nesse canal. Dê a ele permissão de **Ver canal** + **Enviar mensagens** aí." });
+    }
+
+    // 3) precisa criar cargos? então checa Gerenciar Cargos + hierarquia ANTES
+    const precisaCriar = cfg.categories.some((c) => c.options.some((o) => !o.roleId));
+    if (precisaCriar) {
+      try {
+        const me = await bot(`/guilds/${guildId}/members/${process.env.AUTH_DISCORD_ID}`);
+        const roles = await bot(`/guilds/${guildId}/roles`);
+        const pos: Record<string, number> = {}; let manage = false;
+        for (const r of roles) { pos[r.id] = r.position; if ((BigInt(r.permissions || "0") & (1n << 28n)) === (1n << 28n) || (BigInt(r.permissions || "0") & (1n << 3n)) === (1n << 3n)) { /* role tem manage/admin */ } }
+        // permissão do bot: precisa ter Manage Roles em algum cargo dele (ou admin)
+        const myRoles = (me.roles || []) as string[];
+        for (const rid of myRoles) {
+          const r = roles.find((x: any) => x.id === rid);
+          if (r && ((BigInt(r.permissions || "0") & (1n << 28n)) === (1n << 28n) || (BigInt(r.permissions || "0") & (1n << 3n)) === (1n << 3n))) manage = true;
+        }
+        if (!manage) { if (testMsgId) await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "DELETE").catch(() => {}); return Response.json({ ok: false, message: "O bot precisa da permissão **Gerenciar Cargos** pra criar os cargos do registro. Ative e tente de novo (nenhum cargo foi criado)." }); }
+      } catch {
+        if (testMsgId) await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "DELETE").catch(() => {});
+        return Response.json({ ok: false, message: "Não consegui verificar as permissões do bot. Confira se ele está no servidor (nenhum cargo foi criado)." });
+      }
+    }
+
+    // ===== TUDO OK: agora sim cria cargos e publica =====
+    try {
+      cfg = await ensureRoles(guildId, cfg); // cria só os cargos que faltam
       const payload = buildPanel(cfg);
       if (cfg.messageId) {
-        // tenta editar o painel existente (sem duplicar)
         try { await bot(`/channels/${cfg.channelId}/messages/${cfg.messageId}`, "PATCH", payload); }
         catch { const m = await bot(`/channels/${cfg.channelId}/messages`, "POST", payload); cfg.messageId = m.id; }
       } else {
         const m = await bot(`/channels/${cfg.channelId}/messages`, "POST", payload); cfg.messageId = m.id;
       }
+      // apaga a mensagem de teste
+      if (testMsgId) await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "DELETE").catch(() => {});
       await setRegistro(guildId, cfg);
       return Response.json({ ok: true, message: "✓ Painel de registro enviado/atualizado no canal!", config: cfg });
-    } catch (e: any) { return Response.json({ ok: false, message: "Falha ao publicar: " + (e?.message || "") + " (o bot tem acesso ao canal e permissão de Gerenciar Cargos?)" }); }
+    } catch (e: any) {
+      if (testMsgId) await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "DELETE").catch(() => {});
+      return Response.json({ ok: false, message: "Falha ao publicar: " + (e?.message || "") });
+    }
   }
 
   // apenas salvar
