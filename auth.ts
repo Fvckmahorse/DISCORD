@@ -12,7 +12,6 @@ import Discord from "next-auth/providers/discord";
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  debug: true,
   providers: [
     Google,
     Discord({

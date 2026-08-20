@@ -1,25 +1,65 @@
+import { auth } from "@/auth";
+import { isOwner } from "@/lib/owner";
+import { listUserGuilds, canManage } from "@/lib/discord";
 import { bot } from "@/lib/botRest";
-import { getWelcome, buildWelcomeEmbed } from "@/lib/welcome";
+import { kvReady } from "@/lib/kv";
+import { getWelcome, setWelcome, clearWelcome, buildWelcomeEmbed, type WelcomeConfig } from "@/lib/welcome";
 
 export const runtime = "nodejs";
 
-/* Chamado por um "escutador" 24/7 quando um membro entra.
-   Protegido por WELCOME_SECRET. Se o servidor não tiver canal escolhido, NÃO envia. */
-export async function POST(req: Request) {
-  const secret = process.env.WELCOME_SECRET;
-  const got = req.headers.get("x-welcome-secret") || new URL(req.url).searchParams.get("key");
-  if (!secret || got !== secret) return Response.json({ ok: false, error: "não autorizado" }, { status: 403 });
+async function ownerOK() { const s = await auth(); return s?.user && isOwner(s) ? s : null; }
+async function canManageGuild(s: any, guildId: string) {
+  const token = (s as any).discordAccessToken as string | undefined;
+  if (!token) return false;
+  try { const g = (await listUserGuilds(token)).find((x) => x.id === guildId); return !!(g && canManage(g)); } catch { return false; }
+}
 
+// GET ?guild=ID -> config atual + canais de texto do servidor
+export async function GET(req: Request) {
+  const s = await ownerOK(); if (!s) return Response.json({ error: "restrito" }, { status: 403 });
+  if (!kvReady()) return Response.json({ ready: false });
+  const guildId = new URL(req.url).searchParams.get("guild") || "";
+  if (!guildId) return Response.json({ error: "guild ausente" }, { status: 400 });
+  if (!(await canManageGuild(s, guildId))) return Response.json({ error: "sem permissão nesse servidor" }, { status: 403 });
+
+  let channels: any[] = [];
+  try {
+    channels = (await bot(`/guilds/${guildId}/channels`))
+      .filter((c: any) => c.type === 0 || c.type === 5) // texto/anúncio
+      .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+      .map((c: any) => ({ id: c.id, name: c.name }));
+  } catch {}
+  const cfg = await getWelcome(guildId);
+  return Response.json({ ready: true, config: cfg, channels });
+}
+
+// POST -> salvar config (ou desativar) / testar
+export async function POST(req: Request) {
+  const s = await ownerOK(); if (!s) return Response.json({ ok: false, message: "Apenas o dono." }, { status: 403 });
+  if (!kvReady()) return Response.json({ ok: false, message: "Conecte o banco (Upstash) primeiro." });
   const b = await req.json().catch(() => ({}));
   const guildId = String(b.guildId || "");
-  if (!guildId) return Response.json({ ok: false, error: "guildId ausente" }, { status: 400 });
+  if (!guildId) return Response.json({ ok: false, message: "Servidor ausente." });
+  if (!(await canManageGuild(s, guildId))) return Response.json({ ok: false, message: "Você não gerencia esse servidor." }, { status: 403 });
 
-  const cfg = await getWelcome(guildId);
-  if (!cfg || !cfg.enabled || !cfg.channelId) return Response.json({ ok: true, sent: false }); // sem canal = não envia
+  const cfg: WelcomeConfig = {
+    channelId: String(b.channelId || ""),
+    title: String(b.title || "").slice(0, 200),
+    message: String(b.message || "").slice(0, 1500),
+    color: String(b.color || "7C6CFF").replace("#", "").slice(0, 6),
+    enabled: !!b.channelId,
+  };
 
-  try {
-    const payload = buildWelcomeEmbed(cfg, { memberId: b.memberId, memberName: b.memberName, guildName: b.guildName });
-    await bot(`/channels/${cfg.channelId}/messages`, "POST", payload);
-    return Response.json({ ok: true, sent: true });
-  } catch (e: any) { return Response.json({ ok: false, error: e?.message }, { status: 500 }); }
+  if (b.action === "test") {
+    if (!cfg.channelId) return Response.json({ ok: false, message: "Escolha um canal antes de testar." });
+    try {
+      const payload = buildWelcomeEmbed(cfg, { memberId: (s as any).discordUser?.id, memberName: s.user?.name || "você", guildName: b.guildName });
+      await bot(`/channels/${cfg.channelId}/messages`, "POST", payload);
+      return Response.json({ ok: true, message: "✓ Mensagem de teste enviada no canal escolhido!" });
+    } catch (e: any) { return Response.json({ ok: false, message: "Falha ao enviar: " + (e?.message || "") + " (o bot tem acesso ao canal?)" }); }
+  }
+
+  if (!cfg.channelId) { await clearWelcome(guildId); return Response.json({ ok: true, message: "Boas-vindas DESATIVADAS (nenhum canal escolhido)." }); }
+  await setWelcome(guildId, cfg);
+  return Response.json({ ok: true, message: "✓ Configuração salva! O bot enviará no canal escolhido." });
 }

@@ -1,11 +1,26 @@
-import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { DiscordButton, SignOutButton } from "@/components/AuthButtons";
+import { DiscordButton, SignOutButton, GoogleButton } from "@/components/AuthButtons";
 import { listUserGuilds, canManage, iconUrl, addBotUrl, botInGuild, type Guild } from "@/lib/discord";
 
 export default async function Dashboard() {
   const session = await auth();
-  if (!session?.user) redirect("/");
+  if (!session?.user) {
+    // Sem sessão: mostra o login AQUI (não redireciona, pra nunca dar loop)
+    return (
+      <main className="wrap">
+        <div className="mark">
+          <div className="glyph"><img src="/logo.png" alt="zoiudoAI" /></div>
+          <div><div className="wordmark">zoiudo<span>AI</span></div><div className="eyebrow">painel</div></div>
+        </div>
+        <div className="card">
+          <div className="step-k">entrar</div>
+          <h1 style={{ fontSize: 22, marginTop: 4 }}>Faça login pra acessar o painel</h1>
+          <p className="lede">Entre com o Google pra continuar.</p>
+          <GoogleButton />
+        </div>
+      </main>
+    );
+  }
 
   const discordConnected = (session as any).discordConnected as boolean;
   const token = (session as any).discordAccessToken as string | undefined;
