@@ -29,11 +29,14 @@ export function buildPanel(cfg: RegConfig) {
   const color = parseInt((cfg.color || "5865F2").replace("#", ""), 16) || 0x5865f2;
   const cats = cfg.categories.slice(0, 5); // Discord: até 5 linhas por mensagem
   const components = cats.map((cat) => {
-    const opts = cat.options.slice(0, 25).map((o) => ({
-      label: o.label.slice(0, 100),
-      value: o.id,
-      ...(o.emoji ? { emoji: parseEmoji(o.emoji) } : {}),
-    }));
+    const opts = cat.options.slice(0, 25).map((o) => {
+      const em = parseEmoji(o.emoji);
+      return {
+        label: (o.label || "Opção").slice(0, 100),
+        value: o.id,
+        ...(em ? { emoji: em } : {}),
+      };
+    });
     return {
       type: 1,
       components: [{
@@ -52,10 +55,13 @@ export function buildPanel(cfg: RegConfig) {
   };
 }
 
-function parseEmoji(e: string): any {
-  const m = e.match(/^<a?:(\w+):(\d+)>$/); // emoji customizado
+function parseEmoji(e?: string): any | null {
+  const s = (e || "").trim();
+  if (!s) return null; // vazio -> sem emoji nenhum
+  const m = s.match(/^<a?:(\w+):(\d+)>$/); // emoji customizado do servidor
   if (m) return { name: m[1], id: m[2] };
-  return { name: e };
+  // só aceita se tiver algum caractere "de verdade" (evita Invalid Form Body)
+  return { name: s };
 }
 
 /** Dado o clique num select, calcula os novos cargos do membro. */

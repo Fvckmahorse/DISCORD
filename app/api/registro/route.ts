@@ -89,23 +89,38 @@ export async function POST(req: Request) {
       }
     }
 
-    // ===== TUDO OK: agora sim cria cargos e publica =====
+    // ===== VALIDA O PAINEL ANTES DE CRIAR CARGOS =====
+    // Edita a mensagem de teste com o painel real. Se o formato for inválido
+    // (ex.: emoji ruim), falha AQUI, sem nenhum cargo criado.
+    try {
+      const previewPayload = buildPanel(cfg);
+      await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "PATCH", previewPayload);
+    } catch (e: any) {
+      if (testMsgId) await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "DELETE").catch(() => {});
+      const detail = e?.message?.includes("emoji") || String(e?.data?.errors || "").toLowerCase().includes("emoji")
+        ? "Algum emoji está inválido. Deixe o campo de emoji vazio ou use um emoji real."
+        : (e?.message || "formato inválido");
+      return Response.json({ ok: false, message: "O painel não foi aceito pelo Discord (nenhum cargo foi criado). Motivo: " + detail });
+    }
+
+    // ===== PAINEL VÁLIDO: agora sim cria cargos e finaliza =====
     try {
       cfg = await ensureRoles(guildId, cfg); // cria só os cargos que faltam
       const payload = buildPanel(cfg);
-      if (cfg.messageId) {
+      if (cfg.messageId && cfg.messageId !== testMsgId) {
+        // já existia um painel antigo: atualiza ele e apaga o de teste
         try { await bot(`/channels/${cfg.channelId}/messages/${cfg.messageId}`, "PATCH", payload); }
-        catch { const m = await bot(`/channels/${cfg.channelId}/messages`, "POST", payload); cfg.messageId = m.id; }
+        catch { cfg.messageId = testMsgId!; await bot(`/channels/${cfg.channelId}/messages/${cfg.messageId}`, "PATCH", payload); testMsgId = null; }
+        if (testMsgId) await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "DELETE").catch(() => {});
       } else {
-        const m = await bot(`/channels/${cfg.channelId}/messages`, "POST", payload); cfg.messageId = m.id;
+        // usa a própria mensagem de teste como painel final (já está no canal)
+        await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "PATCH", payload);
+        cfg.messageId = testMsgId!;
       }
-      // apaga a mensagem de teste
-      if (testMsgId) await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "DELETE").catch(() => {});
       await setRegistro(guildId, cfg);
       return Response.json({ ok: true, message: "✓ Painel de registro enviado/atualizado no canal!", config: cfg });
     } catch (e: any) {
-      if (testMsgId) await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "DELETE").catch(() => {});
-      return Response.json({ ok: false, message: "Falha ao publicar: " + (e?.message || "") });
+      return Response.json({ ok: false, message: "Falha ao finalizar: " + (e?.message || "") });
     }
   }
 
