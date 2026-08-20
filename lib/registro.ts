@@ -73,8 +73,16 @@ function parseEmoji(e?: string): any | null {
   if (!s) return null;                                   // vazio -> sem emoji
   const m = s.match(/^<a?:(\w+):(\d+)>$/);               // emoji customizado do servidor
   if (m) return { name: m[1], id: m[2] };
-  if (/[^\x00-\x7F]/.test(s)) return { name: s };        // tem caractere não-ASCII (emoji de verdade)
-  return null;                                           // texto comum (ex.: "smile") -> ignora, evita Invalid Form Body
+  // aceita SÓ se for um emoji Unicode de verdade (pictográfico).
+  // Descarta letras, caracteres invisíveis, "quadradinhos" e coisas coladas quebradas.
+  try {
+    const hasRealEmoji = /\p{Extended_Pictographic}/u.test(s);
+    // remove seletores de variação/ZWJ/pele pra medir o "tamanho real"
+    const stripped = s.replace(/[\u200D\uFE0F\u{1F3FB}-\u{1F3FF}]/gu, "");
+    const chars = Array.from(stripped);
+    if (hasRealEmoji && chars.length <= 8) return { name: s };
+  } catch {}
+  return null;                                           // qualquer outra coisa -> sem emoji (não quebra)
 }
 
 /** Dado o clique num select, calcula os novos cargos do membro. */
