@@ -73,16 +73,18 @@ function parseEmoji(e?: string): any | null {
   if (!s) return null;                                   // vazio -> sem emoji
   const m = s.match(/^<a?:(\w+):(\d+)>$/);               // emoji customizado do servidor
   if (m) return { name: m[1], id: m[2] };
-  // aceita SÓ se for um emoji Unicode de verdade (pictográfico).
-  // Descarta letras, caracteres invisíveis, "quadradinhos" e coisas coladas quebradas.
   try {
-    const hasRealEmoji = /\p{Extended_Pictographic}/u.test(s);
-    // remove seletores de variação/ZWJ/pele pra medir o "tamanho real"
-    const stripped = s.replace(/[\u200D\uFE0F\u{1F3FB}-\u{1F3FF}]/gu, "");
-    const chars = Array.from(stripped);
-    if (hasRealEmoji && chars.length <= 8) return { name: s };
-  } catch {}
-  return null;                                           // qualquer outra coisa -> sem emoji (não quebra)
+    // Pesca a PRIMEIRA sequência de emoji completa (base + modificadores + ZWJ),
+    // ignorando números sobrescritos, letras e outros caracteres grudados.
+    const re = /(\p{Extended_Pictographic}(?:\uFE0F|\u{1F3FB}-\u{1F3FF})?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\u{1F3FB}-\u{1F3FF})?)*)/u;
+    const found = s.match(re);
+    if (found && found[1]) return { name: found[1] };
+  } catch {
+    // fallback simples se o \p{...} não for suportado
+    const basic = s.match(/[\u{1F000}-\u{1FAFF}\u2600-\u27BF]/u);
+    if (basic) return { name: basic[0] };
+  }
+  return null;                                           // nada de emoji válido -> sem emoji
 }
 
 /** Dado o clique num select, calcula os novos cargos do membro. */
@@ -104,14 +106,26 @@ export function applySelection(cat: RegCategory, selectedIds: string[], memberRo
 
 /** Cria no servidor os cargos que ainda não existem (opção com cor/label). Salva os roleId de volta. */
 export async function ensureRoles(guildId: string, cfg: RegConfig): Promise<RegConfig> {
+  // mapa nome(normalizado) -> id dos cargos que já existem no servidor
+  let existing: Record<string, string> = {};
+  try {
+    const roles = await bot(`/guilds/${guildId}/roles`);
+    for (const r of roles) if (r.name && r.name !== "@everyone") existing[r.name.trim().toLowerCase()] = r.id;
+  } catch {}
+
   for (const cat of cfg.categories) {
     for (const o of cat.options) {
-      if (o.roleId) continue; // já tem cargo escolhido
+      if (o.roleId) continue; // já tem cargo escolhido manualmente
+      const wanted = (o.label || "").trim().toLowerCase();
+      // se já existe um cargo com exatamente esse nome, REUTILIZA (não cria outro)
+      if (wanted && existing[wanted]) { o.roleId = existing[wanted]; continue; }
+      // senão, cria o cargo novo
       const hex = o.color ? o.color.replace("#", "") : (nameToHex(o.label) || "");
       const color = hex ? parseInt(hex, 16) : 0;
       try {
         const r = await bot(`/guilds/${guildId}/roles`, "POST", { name: o.label, color, reason: "zoiudoAI Registro" });
         o.roleId = r.id;
+        existing[wanted] = r.id; // registra pra não recriar se repetir o nome
       } catch {}
     }
   }

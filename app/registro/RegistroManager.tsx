@@ -15,6 +15,8 @@ export default function RegistroManager({ guilds }: { guilds: { id: string; name
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dragCat, setDragCat] = useState<number | null>(null);
+  const [dragOpt, setDragOpt] = useState<{ ci: number; oi: number } | null>(null);
 
   async function pickGuild(id: string) {
     setGuildId(id); setMsg(null); setCfg(null); setChannels([]); setRoles([]);
@@ -33,6 +35,18 @@ export default function RegistroManager({ guilds }: { guilds: { id: string; name
   const delCat = (ci: number) => up((c) => c.categories.splice(ci, 1));
   const addOpt = (ci: number) => up((c) => c.categories[ci].options.push({ id: uid(), label: "Opção", color: "5865F2" }));
   const delOpt = (ci: number, oi: number) => up((c) => c.categories[ci].options.splice(oi, 1));
+
+  // mover categoria (arrastar)
+  const moveCat = (from: number, to: number) => up((c) => {
+    if (from === to || to < 0 || to >= c.categories.length) return;
+    const [m] = c.categories.splice(from, 1); c.categories.splice(to, 0, m);
+  });
+  // mover opção dentro da MESMA categoria (arrastar)
+  const moveOpt = (ci: number, from: number, to: number) => up((c) => {
+    const opts = c.categories[ci].options;
+    if (from === to || to < 0 || to >= opts.length) return;
+    const [m] = opts.splice(from, 1); opts.splice(to, 0, m);
+  });
 
   async function save(action?: string) {
     if (!cfg) return;
@@ -84,9 +98,20 @@ export default function RegistroManager({ guilds }: { guilds: { id: string; name
           </div>
 
           {cfg.categories.map((cat, ci) => (
-            <div key={cat.id} className="cmd-category" style={{ ["--cat" as any]: "#5865f2", marginTop: 12 }}>
+            <div key={cat.id} className="cmd-category"
+              style={{ ["--cat" as any]: "#5865f2", marginTop: 12, opacity: dragCat === ci ? 0.5 : 1 }}
+              onDragOver={(e) => { if (dragCat !== null) e.preventDefault(); }}
+              onDrop={(e) => { if (dragCat !== null) { e.preventDefault(); moveCat(dragCat, ci); setDragCat(null); } }}
+            >
               <div style={{ padding: 14 }}>
                 <div className="row" style={{ gap: 10 }}>
+                  <span
+                    draggable
+                    onDragStart={() => setDragCat(ci)}
+                    onDragEnd={() => setDragCat(null)}
+                    title="Arraste pra reordenar a categoria"
+                    style={{ cursor: "grab", padding: "0 6px", color: "var(--faint)", fontSize: 18, userSelect: "none" }}
+                  >⋮⋮</span>
                   <input value={cat.name} onChange={(e) => up((c) => (c.categories[ci].name = e.target.value))} placeholder="Nome (ex.: Gênero)" style={{ flex: 1 }} />
                   <select value={cat.mode} onChange={(e) => up((c) => (c.categories[ci].mode = e.target.value as any))} style={{ width: 160 }}>
                     <option value="single">Única (troca)</option>
@@ -96,14 +121,25 @@ export default function RegistroManager({ guilds }: { guilds: { id: string; name
                 </div>
 
                 {cat.options.map((o, oi) => (
-                  <div key={o.id} className="row" style={{ gap: 8, marginTop: 8, alignItems: "center" }}>
-                    <input value={o.emoji || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].emoji = e.target.value))} placeholder="😀" style={{ width: 60 }} />
+                  <div key={o.id} className="row"
+                    style={{ gap: 8, marginTop: 8, alignItems: "center", opacity: dragOpt && dragOpt.ci === ci && dragOpt.oi === oi ? 0.5 : 1 }}
+                    onDragOver={(e) => { if (dragOpt && dragOpt.ci === ci) e.preventDefault(); }}
+                    onDrop={(e) => { if (dragOpt && dragOpt.ci === ci) { e.preventDefault(); moveOpt(ci, dragOpt.oi, oi); setDragOpt(null); } }}
+                  >
+                    <span
+                      draggable
+                      onDragStart={() => setDragOpt({ ci, oi })}
+                      onDragEnd={() => setDragOpt(null)}
+                      title="Arraste pra reordenar a opção"
+                      style={{ cursor: "grab", color: "var(--faint)", userSelect: "none", padding: "0 2px" }}
+                    >⋮⋮</span>
+                    <input value={o.emoji || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].emoji = e.target.value))} placeholder="😀" style={{ width: 54 }} />
                     <input value={o.label} onChange={(e) => up((c) => (c.categories[ci].options[oi].label = e.target.value))} placeholder="Nome da opção" style={{ flex: 1 }} />
                     <select value={o.roleId || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].roleId = e.target.value || undefined))} style={{ width: 160 }}>
                       <option value="">criar cargo novo</option>
                       {roles.map((r) => <option key={r.id} value={r.id}>@{r.name}</option>)}
                     </select>
-                    <input value={o.color || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].color = e.target.value.replace("#", "")))} placeholder="cor" style={{ width: 80 }} title="cor do cargo (se for criar novo)" />
+                    <input value={o.color || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].color = e.target.value.replace("#", "")))} placeholder="cor" style={{ width: 70 }} title="cor do cargo (se for criar novo)" />
                     <button className="btn btn-ghost" onClick={() => delOpt(ci, oi)} style={{ padding: "6px 9px" }}>×</button>
                   </div>
                 ))}
