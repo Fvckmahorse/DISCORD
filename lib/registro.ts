@@ -27,41 +27,54 @@ export function emptyRegistro(): RegConfig { return JSON.parse(JSON.stringify(DE
 /** Monta embed + menus (um select por categoria). */
 export function buildPanel(cfg: RegConfig) {
   const color = parseInt((cfg.color || "5865F2").replace("#", ""), 16) || 0x5865f2;
-  const cats = cfg.categories.slice(0, 5); // Discord: até 5 linhas por mensagem
-  const components = cats.map((cat) => {
-    const opts = cat.options.slice(0, 25).map((o) => {
+  const cats = cfg.categories.slice(0, 5);
+  const components: any[] = [];
+  for (const cat of cats) {
+    // só opções com rótulo de verdade
+    const rawOpts = (cat.options || []).slice(0, 25).filter((o) => (o.label || "").trim());
+    if (rawOpts.length === 0) continue; // categoria sem opções não vira menu (evita erro)
+
+    const seen = new Set<string>();
+    const opts = rawOpts.map((o, i) => {
+      let value = o.id || `opt${i}`;
+      while (seen.has(value)) value += "_"; // valores têm que ser únicos
+      seen.add(value);
       const em = parseEmoji(o.emoji);
-      return {
-        label: (o.label || "Opção").slice(0, 100),
-        value: o.id,
-        ...(em ? { emoji: em } : {}),
-      };
+      const opt: any = { label: (o.label || "Opção").trim().slice(0, 100), value: value.slice(0, 100) };
+      if (em) opt.emoji = em;
+      return opt;
     });
-    return {
+
+    const placeholder = ((cat.name || "Selecione").trim() + (cat.mode === "multiple" ? " (várias)" : "")).slice(0, 150);
+    components.push({
       type: 1,
       components: [{
-        type: 3, // string select
-        custom_id: `reg:${cat.id}`,
-        placeholder: cat.name + (cat.mode === "multiple" ? " (várias)" : ""),
+        type: 3,
+        custom_id: `reg:${cat.id}`.slice(0, 100),
+        placeholder,
         min_values: 0,
-        max_values: cat.mode === "multiple" ? Math.max(1, opts.length) : 1,
-        options: opts.length ? opts : [{ label: "—", value: "none" }],
+        max_values: cat.mode === "multiple" ? opts.length : 1,
+        options: opts,
       }],
-    };
-  });
-  return {
-    embeds: [{ title: cfg.title || "📝 REGISTRO", description: cfg.description || "", color }],
-    components,
-  };
+    });
+  }
+
+  const embed: any = { color };
+  const title = (cfg.title || "").trim();
+  const desc = (cfg.description || "").trim();
+  embed.title = title || "📝 REGISTRO";
+  if (desc) embed.description = desc.slice(0, 4000);
+
+  return { embeds: [embed], components };
 }
 
 function parseEmoji(e?: string): any | null {
   const s = (e || "").trim();
-  if (!s) return null; // vazio -> sem emoji nenhum
-  const m = s.match(/^<a?:(\w+):(\d+)>$/); // emoji customizado do servidor
+  if (!s) return null;                                   // vazio -> sem emoji
+  const m = s.match(/^<a?:(\w+):(\d+)>$/);               // emoji customizado do servidor
   if (m) return { name: m[1], id: m[2] };
-  // só aceita se tiver algum caractere "de verdade" (evita Invalid Form Body)
-  return { name: s };
+  if (/[^\x00-\x7F]/.test(s)) return { name: s };        // tem caractere não-ASCII (emoji de verdade)
+  return null;                                           // texto comum (ex.: "smile") -> ignora, evita Invalid Form Body
 }
 
 /** Dado o clique num select, calcula os novos cargos do membro. */

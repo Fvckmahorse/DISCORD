@@ -97,10 +97,9 @@ export async function POST(req: Request) {
       await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "PATCH", previewPayload);
     } catch (e: any) {
       if (testMsgId) await bot(`/channels/${cfg.channelId}/messages/${testMsgId}`, "DELETE").catch(() => {});
-      const detail = e?.message?.includes("emoji") || String(e?.data?.errors || "").toLowerCase().includes("emoji")
-        ? "Algum emoji está inválido. Deixe o campo de emoji vazio ou use um emoji real."
-        : (e?.message || "formato inválido");
-      return Response.json({ ok: false, message: "O painel não foi aceito pelo Discord (nenhum cargo foi criado). Motivo: " + detail });
+      const errs = e?.data?.errors ? JSON.stringify(e.data.errors) : "";
+      const detail = errs ? errs.slice(0, 400) : (e?.message || "formato inválido");
+      return Response.json({ ok: false, message: "O painel não foi aceito pelo Discord (nenhum cargo foi criado).\nDetalhe: " + detail });
     }
 
     // ===== PAINEL VÁLIDO: agora sim cria cargos e finaliza =====
