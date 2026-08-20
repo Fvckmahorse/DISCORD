@@ -112,3 +112,77 @@ h1{font-size:30px;letter-spacing:-.02em;margin:6px 0 10px}
 /* barra de progresso do build */
 .progress{height:12px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;overflow:hidden}
 .progress > span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#3b45c4);transition:width .3s ease;border-radius:999px}
+
+/* ============================================================
+   MOBILE — só telas pequenas (≤640px). Desktop não é afetado.
+   ============================================================ */
+@media (max-width: 640px) {
+  .wrap { padding: 22px 15px 60px; }
+  h1 { font-size: 24px !important; }
+  .hero h1 { font-size: 30px; }
+  .lede { font-size: 14.5px; }
+
+  /* topo: logo em cima, botão embaixo, tudo alinhado */
+  .topbar { flex-wrap: wrap; gap: 10px; }
+  .topbar > .btn, .topbar .row { width: 100%; }
+  .topbar .row { justify-content: flex-start; }
+
+  /* cards e caixas ocupam a largura toda com respiro igual */
+  .card, .creator { padding: 16px; border-radius: 14px; }
+
+  /* linhas com vários campos: empilha e cada um ocupa 100% */
+  .row { gap: 10px; }
+  .row > .btn { width: 100%; justify-content: center; }
+
+  /* servidores: 1 por linha, botão embaixo */
+  .guilds { grid-template-columns: 1fr; gap: 10px; }
+  .guild { flex-wrap: wrap; }
+  .guild .add, .guild .row { margin-left: 0; width: 100%; }
+  .guild .row { margin-top: 4px; }
+  .guild .add { width: 100%; text-align: center; justify-content: center; }
+
+  /* catálogo de comandos: 1 coluna */
+  .cmd-list { grid-template-columns: 1fr; padding: 14px; }
+  .cmd-category-header { padding: 14px; gap: 10px; }
+  .cmd-category-header .count { margin-left: auto; }
+  .cmd-toolbar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .cmd-toolbar .btn { width: 100%; justify-content: center; }
+
+  /* formulários (criador de comando, boas-vindas, registro): campos full-width */
+  .creator .row { flex-direction: column; align-items: stretch; }
+  .creator .row > * { width: 100% !important; }
+  .creator select, .creator input, .creator textarea { font-size: 16px; } /* 16px evita zoom automático no iOS */
+
+  /* feature cards da landing: 1 por linha */
+  .feature-grid { grid-template-columns: 1fr; }
+
+  /* botões um pouco maiores pra tocar melhor */
+  .btn { padding: 12px 16px; }
+
+  /* mapa de mensagens/erros e blocos <pre> não estouram a tela */
+  pre { font-size: 12px !important; overflow-x: auto; }
+}
+
+/* ===== REGISTRO no mobile: cada opção vira um "cartão" organizado ===== */
+@media (max-width: 640px) {
+  /* a linha de opção (emoji, nome, cargo, cor, x) vira grade 2 colunas alinhada */
+  .reg-opt {
+    display: grid !important;
+    grid-template-columns: auto 1fr;
+    gap: 8px !important;
+    align-items: center;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+  }
+  .reg-opt .drag { grid-row: 1 / span 2; font-size: 20px; }
+  .reg-opt .reg-emoji { width: 100% !important; }
+  .reg-opt .reg-label { grid-column: 2; }
+  .reg-opt .reg-role  { grid-column: 1 / -1; width: 100% !important; }
+  .reg-opt .reg-color { grid-column: 1 / -1; width: 100% !important; }
+  .reg-opt .reg-del   { grid-column: 1 / -1; width: 100%; justify-content: center; }
+  /* cabeçalho da categoria empilha */
+  .reg-cat-head { flex-direction: column; align-items: stretch; gap: 8px; }
+  .reg-cat-head > * { width: 100% !important; }
+}

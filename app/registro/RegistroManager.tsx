@@ -104,7 +104,7 @@ export default function RegistroManager({ guilds }: { guilds: { id: string; name
               onDrop={(e) => { if (dragCat !== null) { e.preventDefault(); moveCat(dragCat, ci); setDragCat(null); } }}
             >
               <div style={{ padding: 14 }}>
-                <div className="row" style={{ gap: 10 }}>
+                <div className="row reg-cat-head" style={{ gap: 10 }}>
                   <span
                     draggable
                     onDragStart={() => setDragCat(ci)}
@@ -121,26 +121,26 @@ export default function RegistroManager({ guilds }: { guilds: { id: string; name
                 </div>
 
                 {cat.options.map((o, oi) => (
-                  <div key={o.id} className="row"
+                  <div key={o.id} className="row reg-opt"
                     style={{ gap: 8, marginTop: 8, alignItems: "center", opacity: dragOpt && dragOpt.ci === ci && dragOpt.oi === oi ? 0.5 : 1 }}
                     onDragOver={(e) => { if (dragOpt && dragOpt.ci === ci) e.preventDefault(); }}
                     onDrop={(e) => { if (dragOpt && dragOpt.ci === ci) { e.preventDefault(); moveOpt(ci, dragOpt.oi, oi); setDragOpt(null); } }}
                   >
-                    <span
+                    <span className="drag"
                       draggable
                       onDragStart={() => setDragOpt({ ci, oi })}
                       onDragEnd={() => setDragOpt(null)}
                       title="Arraste pra reordenar a opção"
                       style={{ cursor: "grab", color: "var(--faint)", userSelect: "none", padding: "0 2px" }}
                     >⋮⋮</span>
-                    <input value={o.emoji || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].emoji = e.target.value))} placeholder="😀" style={{ width: 54 }} />
-                    <input value={o.label} onChange={(e) => up((c) => (c.categories[ci].options[oi].label = e.target.value))} placeholder="Nome da opção" style={{ flex: 1 }} />
-                    <select value={o.roleId || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].roleId = e.target.value || undefined))} style={{ width: 160 }}>
+                    <input className="reg-emoji" value={o.emoji || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].emoji = e.target.value))} placeholder="😀" style={{ width: 54 }} />
+                    <input className="reg-label" value={o.label} onChange={(e) => up((c) => (c.categories[ci].options[oi].label = e.target.value))} placeholder="Nome da opção" style={{ flex: 1 }} />
+                    <select className="reg-role" value={o.roleId || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].roleId = e.target.value || undefined))} style={{ width: 160 }}>
                       <option value="">criar cargo novo</option>
                       {roles.map((r) => <option key={r.id} value={r.id}>@{r.name}</option>)}
                     </select>
-                    <input value={o.color || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].color = e.target.value.replace("#", "")))} placeholder="cor" style={{ width: 70 }} title="cor do cargo (se for criar novo)" />
-                    <button className="btn btn-ghost" onClick={() => delOpt(ci, oi)} style={{ padding: "6px 9px" }}>×</button>
+                    <input className="reg-color" value={o.color || ""} onChange={(e) => up((c) => (c.categories[ci].options[oi].color = e.target.value.replace("#", "")))} placeholder="cor" style={{ width: 70 }} title="cor do cargo (se for criar novo)" />
+                    <button className="btn btn-ghost reg-del" onClick={() => delOpt(ci, oi)} style={{ padding: "6px 9px" }}>×</button>
                   </div>
                 ))}
                 <button className="btn btn-ghost" onClick={() => addOpt(ci)} style={{ marginTop: 8, fontSize: 13 }}>+ Adicionar opção</button>
